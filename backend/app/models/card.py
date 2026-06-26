@@ -67,6 +67,9 @@ class Card(Base):
     # Notes and metadata
     notes = Column(String(500), nullable=True)
 
+    # Multi-tenancy
+    company_id = Column(UUID(as_uuid=True), nullable=True, index=True)  # NULL = super-admin or owned by company
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -136,6 +139,9 @@ class Transaction(Base):
 
     # Additional information
     notes = Column(String(500), nullable=True)
+
+    # Multi-tenancy
+    company_id = Column(UUID(as_uuid=True), nullable=True, index=True)
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, index=True)

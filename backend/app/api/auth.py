@@ -334,7 +334,7 @@ async def verify_mfa_setup(
 
 @router.post("/logout")
 async def logout(
-    refresh_token: str,
+    logout_data: dict = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -342,6 +342,18 @@ async def logout(
     from app.models.refresh_token import RefreshTokenBlacklist
     from app.utils.jwt import create_access_token
     from hashlib import sha256
+
+    # Get refresh token from request body or authorization header
+    refresh_token = None
+    if logout_data and "refresh_token" in logout_data:
+        refresh_token = logout_data["refresh_token"]
+    else:
+        # Try to get from authorization header if Bearer token
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            # This would be the access token, not refresh token
+            # We need the frontend to send refresh_token in body
+            pass
 
     # Invalidate all tokens by incrementing token version
     from sqlalchemy import text
@@ -351,20 +363,21 @@ async def logout(
     )
     db.commit()
 
-    # Blacklist the refresh token
-    token_hash = sha256(refresh_token.encode()).hexdigest()
-    expiry = datetime.utcnow() + timedelta(days=7)  # Refresh token expiry
+    # Blacklist the refresh token if provided
+    if refresh_token:
+        token_hash = sha256(refresh_token.encode()).hexdigest()
+        expiry = datetime.utcnow() + timedelta(days=7)  # Refresh token expiry
 
-    blacklist_entry = RefreshTokenBlacklist(
-        token_hash=token_hash,
-        revoked_at=datetime.utcnow(),
-        expires_at=expiry,
-        user_id=str(current_user.id),
-        revocation_reason="LOGOUT"
-    )
+        blacklist_entry = RefreshTokenBlacklist(
+            token_hash=token_hash,
+            revoked_at=datetime.utcnow(),
+            expires_at=expiry,
+            user_id=str(current_user.id),
+            revocation_reason="LOGOUT"
+        )
 
-    db.add(blacklist_entry)
-    db.commit()
+        db.add(blacklist_entry)
+        db.commit()
 
     return {"message": "Logged out successfully", "tokens_revoked": True}
 

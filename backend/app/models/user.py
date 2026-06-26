@@ -81,6 +81,9 @@ class User(Base):
     # Token versioning for revocation
     token_version = Column(Integer, nullable=False, default=0)
 
+    # Multi-tenancy
+    company_id = Column(UUID(as_uuid=True), nullable=True, index=True)  # NULL = super-admin
+
     # Password management
     password_changed_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     force_password_change = Column(Boolean, nullable=False, default=False)

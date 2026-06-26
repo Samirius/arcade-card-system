@@ -1,131 +1,81 @@
-"""Company and Region models for multi-tenant architecture"""
-import uuid
-from datetime import datetime
-from sqlalchemy import Column, String, DateTime, JSON, Index
+"""Company (tenant) model for multi-tenancy"""
+from sqlalchemy import Column, String, DateTime, Boolean, Integer, Index
 from sqlalchemy.dialects.postgresql import UUID
-import enum
+from sqlalchemy.orm import relationship
+from datetime import datetime
+import uuid
 
 from app.database import Base
 
 
-class SubscriptionTier(str, enum.Enum):
-    """Subscription tiers"""
-    BASIC = "BASIC"
-    STANDARD = "STANDARD"
-    PREMIUM = "PREMIUM"
-    ENTERPRISE = "ENTERPRISE"
-
-
 class Company(Base):
     """
-    Company model for multi-tenant arcade management.
-    
-    Each company can have multiple locations and users.
+    Company (tenant) model.
+
+    Each company represents a separate tenant in the multi-tenant system.
+    A company can have multiple users, cards, and transactions.
     """
     __tablename__ = "companies"
 
     # Primary key
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    # Company details
-    name = Column(String(255), nullable=False)
-    code = Column(String(50), nullable=True, unique=True, index=True)
+    # Company information
+    name = Column(String(255), nullable=False, unique=True, index=True)
+    slug = Column(String(255), nullable=False, unique=True, index=True)  # URL-friendly name
 
-    # Contact
-    email = Column(String(255), nullable=True, unique=True)
+    # Contact information
+    email = Column(String(255), nullable=False)
     phone = Column(String(20), nullable=True)
 
-    # Subscription
-    subscription_tier = Column(
-        String(50),
-        nullable=False,
-        default=SubscriptionTier.STANDARD,
-        index=True
-    )
-    subscription_expires_at = Column(DateTime(timezone=True), nullable=True)
+    # Address
+    address = Column(String(500), nullable=True)
+    city = Column(String(100), nullable=True)
+    country = Column(String(100), nullable=True)
 
-    # Settings (JSONB for flexibility)
-    settings = Column(JSON, nullable=True, default={})
+    # Business information
+    business_type = Column(String(100), nullable=True)  # e.g., "FEC", "Arcade", "Family Entertainment"
+    tax_id = Column(String(50), nullable=True)
 
-    # Metadata
-    notes = Column(String(500), nullable=True)
+    # Status and configuration
+    status = Column(String(20), nullable=False, default='ACTIVE', index=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+
+    # Plan and billing
+    plan = Column(String(50), nullable=False, default='STARTER')  # STARTER, PRO, ENTERPRISE
+    max_venues = Column(Integer, nullable=False, default=1)  # Max number of venues allowed
+    max_users = Column(Integer, nullable=False, default=10)  # Max users allowed
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)  # Soft delete
 
     # Indexes
     __table_args__ = (
         Index('idx_companies_name', 'name'),
-        Index('idx_companies_tier', 'subscription_tier'),
+        Index('idx_companies_slug', 'slug'),
+        Index('idx_companies_status', 'status'),
     )
 
     def __repr__(self):
-        return f"<Company(id={self.id}, name={self.name}, tier={self.subscription_tier})>"
+        return f"<Company(id={self.id}, name={self.name}, slug={self.slug}, status={self.status})>"
 
-    @property
-    def is_subscription_active(self):
-        """Check if subscription is active"""
-        if not self.subscription_expires_at:
-            return True
-        return datetime.utcnow() < self.subscription_expires_at
+    def is_active_company(self):
+        """Check if company is active"""
+        return self.is_active and self.status == 'ACTIVE'
 
-    @property
-    def days_until_expiry(self):
-        """Days until subscription expires"""
-        if not self.subscription_expires_at:
-            return 999
-        delta = self.subscription_expires_at - datetime.utcnow()
-        return delta.days
+    def has_soft_deleted(self):
+        """Check if company is soft deleted"""
+        return self.deleted_at is not None
 
+    def can_add_user(self, db):
+        """Check if company can add more users"""
+        from app.models.user import User
+        current_users = db.query(User).filter(User.company_id == self.id).count()
+        return current_users < self.max_users
 
-class Region(Base):
-    """
-    Region model for geographical organization.
-    
-    Each company can have multiple regions.
-    Each region can have multiple locations.
-    """
-    __tablename__ = "regions"
-
-    # Primary key
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-
-    # Company
-    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-
-    # Region details
-    name = Column(String(255), nullable=False)
-    code = Column(String(50), nullable=True, unique=True, index=True)
-
-    # Manager
-    manager_id = Column(UUID(as_uuid=True), nullable=True, index=True)
-    manager_name = Column(String(100), nullable=True)
-
-    # Geography
-    country = Column(String(50), nullable=True)
-    timezone = Column(String(50), default='UTC')
-
-    # Metadata
-    notes = Column(String(500), nullable=True)
-
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Indexes
-    __table_args__ = (
-        Index('idx_regions_company', 'company_id'),
-        Index('idx_regions_name', 'name'),
-        Index('idx_regions_manager', 'manager_id'),
-    )
-
-    def __repr__(self):
-        return f"<Region(id={self.id}, name={self.name}, country={self.country})>"
-
-    @property
-    def full_name(self):
-        """Get full region name with country"""
-        if self.country:
-            return f"{self.name}, {self.country}"
-        return self.name
+    def can_add_venue(self, db):
+        """Check if company can add more venues"""
+        # This will be used when Venue model exists
+        return True  # TODO: Implement when Venue model exists
