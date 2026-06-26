@@ -5,19 +5,70 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime, timedelta
+import re
 
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserResponse, UserLogin
 from app.services.auth import AuthService
 from app.config import settings
-import hashlib
 
 # Create router
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 # Security
 security = HTTPBearer(auto_error=False)
+
+
+def validate_password_strength(password: str) -> bool:
+    """Validate password strength"""
+    if len(password) < 12:
+        return False
+    if not re.search(r'[A-Z]', password):
+        return False
+    if not re.search(r'[a-z]', password):
+        return False
+    if not re.search(r'\d', password):
+        return False
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        return False
+    return True
+
+
+class UserCreateRequest(BaseModel):
+    """User registration request with validation"""
+    email: str
+    password: str
+    first_name: str
+    last_name: str
+    phone: Optional[str] = None
+    role: Optional[str] = "STAFF"
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def email_must_be_lowercase(cls, v: str) -> str:
+        return v.lower()
+
+    @field_validator('password')
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if not validate_password_strength(v):
+            raise ValueError('Password must be 12+ characters with uppercase, lowercase, numbers, and special characters')
+        return v
+
+
+class MFAVerifyRequest(BaseModel):
+    """MFA verification request"""
+    mfa_code: str
+
+    @field_validator('mfa_code')
+    @classmethod
+    def mfa_code_length(cls, v: str) -> str:
+        if len(v) != 6:
+            raise ValueError('MFA code must be 6 digits')
+        if not v.isdigit():
+            raise ValueError('MFA code must be numeric')
+        return v
 
 
 async def get_current_user(
@@ -58,18 +109,20 @@ async def get_current_user(
     return user
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_user(
-    user_data: UserCreate,
+    request: Request,
+    user_data: UserCreateRequest,
     db: Session = Depends(get_db)
 ):
     """
     Register a new user.
 
     - Email must be unique
-    - Password must be 8-72 characters
+    - Password must be 12-72 characters with complexity requirements
     - Default role: STAFF
-    - Default status: PENDING (requires activation)
+    - Default status: PENDING (requires email verification)
+    - Sends verification email
     """
     try:
         user = AuthService.register_user(
@@ -81,7 +134,18 @@ async def register_user(
             phone=user_data.phone,
             role=user_data.role or UserRole.STAFF
         )
-        return user
+
+        # Send verification email
+        from app.utils.email_verification import create_email_verification_token, send_verification_email
+        token = create_email_verification_token(user.email)
+        send_verification_email(user.email, token)
+
+        return {
+            "message": "User registered successfully. Please check your email for verification.",
+            "user_id": str(user.id),
+            "email": user.email,
+            "status": user.status
+        }
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -95,20 +159,9 @@ async def login(
     login_data: UserLogin,
     db: Session = Depends(get_db)
 ):
-    """
-    Login with email and password.
-
-    Returns:
-        - access_token: JWT token for API access (30 min expiry)
-        - refresh_token: JWT token for refreshing access (7 days expiry)
-        - user: User information
-        - requires_mfa: Boolean indicating if MFA is required
-
-    If MFA is enabled, returns `requires_mfa: true` and no tokens.
-    Client should then call `/mfa/verify` with the MFA code.
-    """
+    """Login with email and password."""
     try:
-        client_ip = request.client.host
+        client_ip = request.client.host if request.client else "unknown"
         user, access_token, refresh_token = AuthService.authenticate_user(
             db=db,
             email=login_data.email,
@@ -121,6 +174,8 @@ async def login(
             "refresh_token": refresh_token,
             "token_type": "bearer",
             "expires_in": settings.access_token_expire_minutes * 60,
+            "expires_at": str(datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)),
+            "warning_threshold": 300,
             "user": {
                 "id": str(user.id),
                 "email": user.email,
@@ -142,21 +197,20 @@ async def login(
 
 @router.post("/login/mfa")
 async def login_with_mfa(
+    request: Request,
     login_data: UserLogin,
-    mfa_code: str,
+    mfa_request: MFAVerifyRequest,
     db: Session = Depends(get_db)
 ):
-    """
-    Login with email, password, and MFA code.
-
-    Required if user has MFA enabled.
-    """
+    """Login with email, password, and MFA code."""
     try:
+        client_ip = request.client.host if request.client else "unknown"
         user, access_token, refresh_token = AuthService.authenticate_user(
             db=db,
             email=login_data.email,
             password=login_data.password,
-            mfa_code=mfa_code
+            mfa_code=mfa_request.mfa_code,
+            client_ip=client_ip
         )
 
         return {
@@ -164,6 +218,8 @@ async def login_with_mfa(
             "refresh_token": refresh_token,
             "token_type": "bearer",
             "expires_in": settings.access_token_expire_minutes * 60,
+            "expires_at": str(datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)),
+            "warning_threshold": 300,
             "user": {
                 "id": str(user.id),
                 "email": user.email,
@@ -187,13 +243,7 @@ async def refresh_token(
     refresh_token: str,
     db: Session = Depends(get_db)
 ):
-    """
-    Refresh access token using refresh token.
-
-    Returns:
-        - access_token: New JWT token
-        - user: User information
-    """
+    """Refresh access token using refresh token."""
     try:
         user, access_token = AuthService.refresh_token(
             db=db,
@@ -204,6 +254,8 @@ async def refresh_token(
             "access_token": access_token,
             "token_type": "bearer",
             "expires_in": settings.access_token_expire_minutes * 60,
+            "expires_at": str(datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)),
+            "warning_threshold": 300,
             "user": {
                 "id": str(user.id),
                 "email": user.email,
@@ -226,16 +278,9 @@ async def initiate_mfa_setup(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Initiate MFA setup.
-
-    Returns QR code URL for authenticator app.
-
-    Requires authentication.
-    """
+    """Initiate MFA setup."""
     try:
         qr_code_url = AuthService.setup_mfa_initiation(db, str(current_user.id))
-
         return {
             "qr_code_url": qr_code_url,
             "message": "Scan QR code with authenticator app, then verify with /mfa/setup/verify"
@@ -249,26 +294,17 @@ async def initiate_mfa_setup(
 
 @router.post("/mfa/setup/verify")
 async def verify_mfa_setup(
-    mfa_code: str,
+    mfa_request: MFAVerifyRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Verify MFA setup and enable MFA for user.
-
-    Call after scanning QR code from /mfa/setup/initiate.
-
-    Returns backup codes for recovery.
-
-    Requires authentication.
-    """
+    """Verify MFA setup and enable MFA for user."""
     try:
         qr_code_url, backup_codes = AuthService.enable_mfa(
             db=db,
             user_id=str(current_user.id),
-            mfa_code=mfa_code
+            mfa_code=mfa_request.mfa_code
         )
-
         return {
             "message": "MFA enabled successfully",
             "qr_code_url": qr_code_url,
@@ -287,27 +323,33 @@ async def logout(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Logout user.
+    """Logout user."""
+    # Invalidate all tokens by incrementing token version
+    from sqlalchemy import text
+    db.execute(
+        text("UPDATE users SET token_version = token_version + 1 WHERE id = :user_id"),
+        {"user_id": str(current_user.id)}
+    )
+    db.commit()
 
-    Client should discard tokens.
-
-    Requires authentication.
-    """
     AuthService.logout_user(db, str(current_user.id))
     return {"message": "Logged out successfully"}
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me")
 async def get_current_user_info(
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Get current user information.
-
-    Requires authentication.
-    """
-    return current_user
+    """Get current user information."""
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "first_name": current_user.first_name,
+        "last_name": current_user.last_name,
+        "role": current_user.role,
+        "status": current_user.status,
+        "mfa_enabled": current_user.mfa_enabled
+    }
 
 
 @router.post("/verify-email/{token}")
@@ -318,8 +360,53 @@ async def verify_email(
     """
     Verify user email address.
 
-    In production, this would use a JWT token sent via email.
-    For now, we'll implement a simplified version.
+    Validates the JWT token and activates the user account.
     """
-    # TODO: Implement email verification with JWT tokens
-    return {"message": "Email verification not yet implemented"}
+    from app.utils.email_verification import verify_email_token
+
+    # Verify token
+    email = verify_email_token(token)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token"
+        )
+
+    # Find user
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Check if already verified
+    if user.is_verified:
+        return {
+            "message": "Email already verified",
+            "email": user.email
+        }
+
+    # Mark as verified and active
+    user.is_verified = True
+    user.status = UserStatus.ACTIVE
+    user.updated_at = datetime.utcnow()
+    db.commit()
+
+    # Log verification
+    from app.utils.audit import log_audit
+    log_audit(
+        db=db,
+        user_id=user.id,
+        action="UPDATE",
+        resource_type="user",
+        resource_id=user.id,
+        old_values={"is_verified": False, "status": "PENDING"},
+        new_values={"is_verified": True, "status": "ACTIVE"}
+    )
+
+    return {
+        "message": "Email verified successfully",
+        "email": user.email,
+        "status": "ACTIVE"
+    }

@@ -1,7 +1,7 @@
 """User model for authentication and authorization"""
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum, Index
+from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum, Index, Integer
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 import enum
 
@@ -73,10 +73,13 @@ class User(Base):
     backup_codes = Column(ARRAY(String), nullable=True)  # Backup MFA codes
 
     # Login tracking
-    failed_login_attempts = Column(String(10), nullable=False, default="0")
+    failed_login_attempts = Column(Integer, nullable=False, default=0)
     last_login = Column(DateTime(timezone=True), nullable=True)
     last_failed_login = Column(DateTime(timezone=True), nullable=True)
     locked_until = Column(DateTime(timezone=True), nullable=True)
+    
+    # Token versioning for revocation
+    token_version = Column(Integer, nullable=False, default=0)
 
     # Password management
     password_changed_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
@@ -140,13 +143,14 @@ class User(Base):
 
     def increment_failed_login(self):
         """Increment failed login counter"""
-        current = int(self.failed_login_attempts or 0)
-        self.failed_login_attempts = str(current + 1)
+        current = self.failed_login_attempts or 0
+        self.failed_login_attempts = current + 1
         self.last_failed_login = datetime.utcnow()
 
         # Lock after 5 failed attempts (from config)
         from app.config import settings
         if current + 1 >= settings.max_login_attempts:
+            from datetime import timedelta
             self.locked_until = datetime.utcnow() + timedelta(minutes=settings.lockout_duration_minutes)
             self.status = UserStatus.LOCKED
 

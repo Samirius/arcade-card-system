@@ -88,7 +88,8 @@ class AuthService:
         db: Session,
         email: str,
         password: str,
-        mfa_code: Optional[str] = None
+        mfa_code: Optional[str] = None,
+        client_ip: Optional[str] = None
     ) -> Tuple[User, str, str]:
         """
         Authenticate user with email and password.
@@ -98,6 +99,7 @@ class AuthService:
             email: User email
             password: Plain text password
             mfa_code: MFA code (if MFA enabled)
+            client_ip: Client IP address for logging
 
         Returns:
             Tuple of (user, access_token, refresh_token)
@@ -124,6 +126,10 @@ class AuthService:
             db.commit()
             raise ValueError("Invalid email or password")
 
+        # Check if MFA is required for privileged roles
+        if user.is_privileged() and not user.mfa_enabled:
+            raise ValueError("MFA is required for privileged accounts. Please enable MFA first.")
+
         # Check if MFA is required
         if user.mfa_enabled:
             if not mfa_code:
@@ -148,14 +154,14 @@ class AuthService:
             "sub": str(user.id)
         })
 
-        # Log successful login
+        # Log successful login with IP address
         log_audit(
             db=db,
             user_id=user.id,
             action="LOGIN",
             resource_type="user",
             resource_id=user.id,
-            ip_address=None,  # Will be set from request
+            ip_address=client_ip,
             success=True
         )
 

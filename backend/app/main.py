@@ -1,5 +1,7 @@
 """FastAPI application with security"""
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from app.config import settings
@@ -7,6 +9,9 @@ from app.utils.cors import configure_cors
 from app.utils.security import security_middleware
 from app.api.auth import router as auth_router
 from app.database import engine, Base
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 
 @asynccontextmanager
@@ -40,6 +45,13 @@ app = FastAPI(
     redoc_url="/redoc" if settings.debug else None,
     lifespan=lifespan
 )
+
+# Create limiter and add to app state
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+# Add rate limiting
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configure CORS
 configure_cors(app)
