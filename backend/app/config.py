@@ -10,7 +10,7 @@ if env_path.exists():
     load_dotenv(env_path)
 
 # Database
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql:///arcade_management?host=/var/run/postgresql&port=5433")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://arcade_user:arcade_password@localhost:5433/arcade_management")
 
 # Security - from environment with validation
 SECRET_KEY = os.getenv("SECRET_KEY", "")

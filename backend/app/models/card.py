@@ -145,9 +145,9 @@ class Transaction(Base):
 
     # Indexes
     __table_args__ = (
-        Index('idx_transactions_card_date', 'card_uid', 'created_at DESC'),
-        Index('idx_transactions_type_date', 'transaction_type', 'created_at DESC'),
-        Index('idx_transactions_user_date', 'user_id', 'created_at DESC'),
+        Index('idx_transactions_card_date', 'card_uid', 'created_at'),
+        Index('idx_transactions_type_date', 'transaction_type', 'created_at'),
+        Index('idx_transactions_user_date', 'user_id', 'created_at'),
     )
 
     def __repr__(self):

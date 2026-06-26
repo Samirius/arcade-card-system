@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import audit_logs  # This will be imported from models when created
+from app.models.audit import AuditLog
 
 
 # Setup file logging

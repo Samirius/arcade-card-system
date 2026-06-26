@@ -8,7 +8,7 @@ from sqlalchemy import or_, and_
 from app.models.user import User, UserRole, UserStatus
 from app.utils.password import hash_password, verify_password
 from app.utils.jwt import create_access_token, create_refresh_token
-from app.utils.mfa import generate_mfa_secret, verify_mfa_code, generate_qr_code
+from app.utils.mfa import generate_mfa_secret, verify_mfa_token, generate_mfa_qr_code
 from app.utils.audit import log_audit
 from app.config import settings
 
@@ -128,7 +128,7 @@ class AuthService:
         if user.mfa_enabled:
             if not mfa_code:
                 raise ValueError("MFA code required")
-            if not verify_mfa_code(user.mfa_secret, mfa_code):
+            if not verify_mfa_token(user.mfa_secret, mfa_code):
                 user.increment_failed_login()
                 db.commit()
                 raise ValueError("Invalid MFA code")
@@ -186,7 +186,7 @@ class AuthService:
             raise ValueError("User not found")
 
         # Verify the MFA code
-        if not user.mfa_secret or not verify_mfa_code(user.mfa_secret, mfa_code):
+        if not user.mfa_secret or not verify_mfa_token(user.mfa_secret, mfa_code):
             raise ValueError("Invalid MFA code")
 
         # Generate backup codes

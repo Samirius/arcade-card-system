@@ -88,7 +88,7 @@ class User(Base):
 
     # Indexes for common queries
     __table_args__ = (
-        Index('idx_users_email_lower', 'email', postgresql_ops={'email': 'varchar_pattern_ops'}),
+        Index('idx_users_email_lower', 'email'),
         Index('idx_users_role_status', 'role', 'status'),
         Index('idx_users_status_active', 'status'),
     )
