@@ -6,7 +6,7 @@ from app.models.refresh_token import RefreshTokenBlacklist
 from app.models.customer import Customer
 from app.models.location import Location, LocationStatus
 from app.models.machine import Machine, MachineType, MachineStatus
-from app.models.company import Company, SubscriptionTier, Region
+from app.models.company import Company
 
 __all__ = [
     "User",
@@ -18,7 +18,7 @@ __all__ = [
     "Transaction",
     "AuditLog",
     "AuditAction",
-    "RefreshToken",
+    "RefreshTokenBlacklist",
     "Customer",
     "Location",
     "LocationStatus",
@@ -26,6 +26,4 @@ __all__ = [
     "MachineType",
     "MachineStatus",
     "Company",
-    "SubscriptionTier",
-    "Region",
 ]
