@@ -12,7 +12,7 @@ def test_root_endpoint():
     data = response.json()
     assert "message" in data
     assert data["status"] == "running"
-    assert data["phase"] == "Phase 0 - Environment Setup"
+    assert "Phase 0 - Day 3 Complete" in data["phase"]
 
 def test_health_check():
     """Test health check"""

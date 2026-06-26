@@ -1,15 +1,17 @@
 """Application configuration"""
+import os
+from typing import Optional, List
 from pydantic_settings import BaseSettings
-from typing import Optional
+from functools import lru_cache
 
 class Settings(BaseSettings):
     """Application settings"""
 
     # Database
-    database_url: str
+    database_url: str = "postgresql:///arcade_management?host=/var/run/postgresql&port=5433"
 
     # Security
-    secret_key: str
+    secret_key: str = "ArcadeSecure2024!ChangeThisInProduction"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
@@ -33,8 +35,20 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
+    # CORS
+    cors_origins: str = "http://localhost:3000,http://localhost:8000"
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Get CORS origins as list"""
+        return [origin.strip() for origin in self.cors_origins.split(",")]
+
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "allow"  # Allow extra fields
 
-settings = Settings()
+@lru_cache()
+def get_settings() -> Settings:
+    """Get cached settings instance"""
+    return Settings()
