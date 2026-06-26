@@ -6,7 +6,7 @@ from datetime import datetime
 import uuid
 
 from app.database import Base
-from app.models.transaction import Transaction
+from app.models.card import Transaction
 
 
 class BalanceLedger(Base):
@@ -52,7 +52,7 @@ class BalanceLedger(Base):
 
     # Metadata
     reason_code = Column(String(50), nullable=True)  # For disputes and reversals
-    metadata = Column(JSONB, nullable=True)  # Flexible context data
+    extra_metadata = Column(JSONB, nullable=True)  # Flexible context data
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, index=True)
@@ -87,7 +87,7 @@ class BalanceLedger(Base):
             "user_id": str(self.user_id) if self.user_id else None,
             "notes": self.notes,
             "reason_code": self.reason_code,
-            "metadata": self.metadata,
+            "metadata": self.extra_metadata,
             "created_at": self.created_at.isoformat()
         }
 

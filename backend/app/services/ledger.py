@@ -5,8 +5,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from app.models.balance import BalanceLedger, BalanceSnapshot
-from app.models.card import Card
-from app.models.transaction import Transaction
+from app.models.card import Card, Transaction
 from app.models.user import User
 
 

@@ -7,7 +7,7 @@ from decimal import Decimal
 import uuid
 
 from app.database import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.balance import (
     BalanceOperationRequest,
     BalanceHistoryResponse,
@@ -16,7 +16,8 @@ from app.schemas.balance import (
     TransactionRollbackRequest
 )
 from app.services.ledger import BalanceLedgerService
-from app.api.auth import get_current_user, require_role
+from app.api.auth import get_current_user
+from app.api.authorization import require_role
 
 router = APIRouter(prefix="/balance", tags=["balance"])
 

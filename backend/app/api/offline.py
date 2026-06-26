@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from app.database import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.offline import (
     OfflineTokenIssueRequest,
     OfflineTokenResponse,
@@ -16,7 +16,8 @@ from app.schemas.offline import (
     DeviceQueueStatusResponse
 )
 from app.services.offline import OfflineTokenService
-from app.api.auth import get_current_user, require_role
+from app.api.auth import get_current_user
+from app.api.authorization import require_role
 
 router = APIRouter(prefix="/offline", tags=["offline"])
 

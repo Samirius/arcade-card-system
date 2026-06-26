@@ -4,8 +4,24 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
+from enum import Enum
 
 from app.database import Base
+
+
+class CompanyPlan(str, Enum):
+    """Subscription plan types"""
+    STARTER = "STARTER"
+    PRO = "PRO"
+    ENTERPRISE = "ENTERPRISE"
+
+
+class CompanyStatus(str, Enum):
+    """Company status types"""
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+    TRIAL = "TRIAL"
+    INACTIVE = "INACTIVE"
 
 
 class Company(Base):

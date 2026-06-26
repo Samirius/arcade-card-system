@@ -7,9 +7,10 @@ import uuid
 
 from app.database import get_db
 from app.models.company import Company, CompanyPlan, CompanyStatus
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.company import CompanyCreate, CompanyUpdate, CompanyResponse, CompanyStats
-from app.api.auth import get_current_user, require_role
+from app.api.auth import get_current_user
+from app.api.authorization import require_role
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
