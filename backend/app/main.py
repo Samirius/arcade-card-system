@@ -13,6 +13,7 @@ from app.api.transactions import router as transactions_router
 from app.api.dashboard import router as dashboard_router
 from app.api.companies import router as companies_router
 from app.api.balance import router as balance_router
+from app.api.offline import router as offline_router
 from app.database import engine, Base
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -71,6 +72,7 @@ app.include_router(transactions_router)
 app.include_router(dashboard_router)
 app.include_router(companies_router)
 app.include_router(balance_router)
+app.include_router(offline_router)
 
 
 @app.get("/")
