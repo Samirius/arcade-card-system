@@ -44,13 +44,16 @@ async def security_info():
     """Security information endpoint (for debugging)"""
     return {
         "security_features": {
-            "password_hashing": "bcrypt (12 rounds)",
+            "password_hashing": "bcrypt (12 rounds, 72-byte limit)",
             "jwt_tokens": "enabled",
             "mfa": "available",
             "audit_logging": "enabled",
             "rate_limiting": "100 req/min",
             "cors": "restricted",
-            "security_headers": "enabled"
+            "security_headers": "10+ headers (CSP, HSTS, Permissions-Policy, etc.)",
+            "input_validation": "Pydantic schemas",
+            "api_versioning": "v1 prefix",
+            "database_ssl": "required in production"
         }
     }
 
