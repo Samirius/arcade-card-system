@@ -1,0 +1,160 @@
+{
+  "app": {
+    "name": "Sindbad",
+    "tagline": "Run your arcade"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "cards": "Cards",
+    "transactions": "Transactions",
+    "staff": "Staff",
+    "locations": "Locations",
+    "machines": "Machines",
+    "customers": "Customers",
+    "maintenance": "Maintenance",
+    "reports": "Reports",
+    "settings": "Settings"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "email": "Email",
+    "password": "Password",
+    "mfaCode": "Verification Code",
+    "mfaPlaceholder": "Enter 6-digit code",
+    "verifyMfa": "Verify",
+    "loginButton": "Login",
+    "loginSubtitle": "Welcome to Sindbad",
+    "invalidCredentials": "Invalid credentials",
+    "mfaRequired": "MFA code required"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "revenueToday": "Revenue Today",
+    "activeCards": "Active Cards",
+    "transactionsToday": "Transactions Today",
+    "cardsIssued": "Total Cards",
+    "revenueWeek": "Weekly Revenue",
+    "cardsByType": "Cards by Type",
+    "recentTransactions": "Recent Transactions",
+    "noTransactions": "No transactions"
+  },
+  "card": {
+    "title": "Cards",
+    "single": "Card",
+    "uid": "Card UID",
+    "balance": "Balance",
+    "type": "Type",
+    "status": "Status",
+    "customer": "Customer",
+    "createdAt": "Created At",
+    "lastUsed": "Last Used",
+    "types": {
+      "regular": "Regular",
+      "vip": "VIP",
+      "staff": "Staff",
+      "test": "Test"
+    },
+    "statuses": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "lost": "Lost",
+      "stolen": "Stolen",
+      "damaged": "Damaged"
+    },
+    "search": "Search by card UID or customer name...",
+    "noCards": "No cards found",
+    "details": "Card Details",
+    "transactions": "Card Transactions",
+    "balanceHistory": "Balance History"
+  },
+  "transaction": {
+    "title": "Transactions",
+    "single": "Transaction",
+    "id": "Transaction ID",
+    "date": "Date",
+    "type": "Type",
+    "amount": "Amount",
+    "status": "Status",
+    "user": "By",
+    "types": {
+      "add": "Add Credit",
+      "deduct": "Charge",
+      "refund": "Refund"
+    },
+    "statuses": {
+      "completed": "Completed",
+      "pending": "Pending",
+      "failed": "Failed"
+    },
+    "noTransactions": "No transactions found"
+  },
+  "cashier": {
+    "title": "Cashier",
+    "searchCard": "Search card...",
+    "scanCard": "Scan Card",
+    "registerNew": "Register New Card",
+    "todaysTransactions": "Today's Transactions",
+    "addCredit": "Add Credit",
+    "charge": "Charge",
+    "enterAmount": "Enter Amount",
+    "confirmAdd": "Confirm Add Credit",
+    "confirmCharge": "Confirm Charge",
+    "success": "Operation completed successfully",
+    "currentBalance": "Current Balance",
+    "newBalance": "New Balance"
+  },
+  "portal": {
+    "balance": "My Card Balance",
+    "history": "Transaction History",
+    "refresh": "Refresh",
+    "noHistory": "No history"
+  },
+  "actions": {
+    "add": "Add",
+    "charge": "Charge",
+    "save": "Save",
+    "cancel": "Cancel",
+    "search": "Search",
+    "register": "Register",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "edit": "Edit",
+    "delete": "Delete",
+    "export": "Export",
+    "view": "View",
+    "back": "Back",
+    "confirm": "Confirm",
+    "close": "Close",
+    "refresh": "Refresh"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Done successfully",
+    "noData": "No data available",
+    "currency": "EGP",
+    "yes": "Yes",
+    "no": "No",
+    "all": "All",
+    "total": "Total",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "thisWeek": "This Week",
+    "thisMonth": "This Month"
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": "Profile",
+    "language": "Language",
+    "security": "Security",
+    "arabic": "العربية",
+    "english": "English"
+  },
+  "validation": {
+    "required": "This field is required",
+    "email": "Invalid email address",
+    "minLength": "Minimum {n} characters",
+    "positiveAmount": "Amount must be greater than zero"
+  }
+}

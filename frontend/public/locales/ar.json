@@ -1,0 +1,160 @@
+{
+  "app": {
+    "name": "سندباد",
+    "tagline": "نظام إدارة ألعابك"
+  },
+  "nav": {
+    "dashboard": "الرئيسية",
+    "cards": "البطاقات",
+    "transactions": "المعاملات",
+    "staff": "الموظفون",
+    "locations": "المواقع",
+    "machines": "الأجهزة",
+    "customers": "العملاء",
+    "maintenance": "الصيانة",
+    "reports": "التقارير",
+    "settings": "الإعدادات"
+  },
+  "auth": {
+    "login": "تسجيل الدخول",
+    "logout": "تسجيل الخروج",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "mfaCode": "رمز التحقق",
+    "mfaPlaceholder": "أدخل الرمز من 6 أرقام",
+    "verifyMfa": "تحقق",
+    "loginButton": "دخول",
+    "loginSubtitle": "مرحباً بك في سندباد",
+    "invalidCredentials": "بيانات الدخول غير صحيحة",
+    "mfaRequired": "مطلوب رمز التحقق الثنائي"
+  },
+  "dashboard": {
+    "title": "لوحة التحكم",
+    "revenueToday": "إيرادات اليوم",
+    "activeCards": "البطاقات النشطة",
+    "transactionsToday": "معاملات اليوم",
+    "cardsIssued": "إجمالي البطاقات",
+    "revenueWeek": "الإيرادات الأسبوعية",
+    "cardsByType": "البطاقات حسب النوع",
+    "recentTransactions": "أحدث المعاملات",
+    "noTransactions": "لا توجد معاملات"
+  },
+  "card": {
+    "title": "البطاقات",
+    "single": "بطاقة",
+    "uid": "رقم البطاقة",
+    "balance": "الرصيد",
+    "type": "النوع",
+    "status": "الحالة",
+    "customer": "العميل",
+    "createdAt": "تاريخ الإنشاء",
+    "lastUsed": "آخر استخدام",
+    "types": {
+      "regular": "عادية",
+      "vip": "مميزة",
+      "staff": "موظف",
+      "test": "اختبار"
+    },
+    "statuses": {
+      "active": "نشطة",
+      "inactive": "غير نشطة",
+      "lost": "مفقودة",
+      "stolen": "مسروقة",
+      "damaged": "تالفة"
+    },
+    "search": "ابحث برقم البطاقة أو اسم العميل...",
+    "noCards": "لا توجد بطاقات",
+    "details": "تفاصيل البطاقة",
+    "transactions": "معاملات البطاقة",
+    "balanceHistory": "سجل الرصيد"
+  },
+  "transaction": {
+    "title": "المعاملات",
+    "single": "معاملة",
+    "id": "رقم المعاملة",
+    "date": "التاريخ",
+    "type": "النوع",
+    "amount": "المبلغ",
+    "status": "الحالة",
+    "user": "بواسطة",
+    "types": {
+      "add": "إضافة رصيد",
+      "deduct": "خصم",
+      "refund": "استرجاع"
+    },
+    "statuses": {
+      "completed": "مكتملة",
+      "pending": "قيد الانتظار",
+      "failed": "فاشلة"
+    },
+    "noTransactions": "لا توجد معاملات"
+  },
+  "cashier": {
+    "title": "الكاشير",
+    "searchCard": "ابحث عن بطاقة...",
+    "scanCard": "امسح البطاقة",
+    "registerNew": "تسجيل بطاقة جديدة",
+    "todaysTransactions": "معاملات اليوم",
+    "addCredit": "إضافة رصيد",
+    "charge": "خصم",
+    "enterAmount": "أدخل المبلغ",
+    "confirmAdd": "تأكيد إضافة الرصيد",
+    "confirmCharge": "تأكيد الخصم",
+    "success": "تمت العملية بنجاح",
+    "currentBalance": "الرصيد الحالي",
+    "newBalance": "الرصيد الجديد"
+  },
+  "portal": {
+    "balance": "رصيد بطاقتي",
+    "history": "سجل المعاملات",
+    "refresh": "تحديث",
+    "noHistory": "لا يوجد سجل"
+  },
+  "actions": {
+    "add": "إضافة",
+    "charge": "خصم",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "search": "بحث",
+    "register": "تسجيل",
+    "activate": "تفعيل",
+    "deactivate": "إلغاء التفعيل",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "export": "تصدير",
+    "view": "عرض",
+    "back": "رجوع",
+    "confirm": "تأكيد",
+    "close": "إغلاق",
+    "refresh": "تحديث"
+  },
+  "common": {
+    "loading": "جاري التحميل...",
+    "error": "حدث خطأ",
+    "success": "تم بنجاح",
+    "noData": "لا توجد بيانات",
+    "currency": "ج.م",
+    "yes": "نعم",
+    "no": "لا",
+    "all": "الكل",
+    "total": "الإجمالي",
+    "today": "اليوم",
+    "yesterday": "أمس",
+    "thisWeek": "هذا الأسبوع",
+    "thisMonth": "هذا الشهر"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "profile": "الملف الشخصي",
+    "language": "اللغة",
+    "security": "الأمان",
+    "arabic": "العربية",
+    "english": "English"
+  },
+  "validation": {
+    "required": "هذا الحقل مطلوب",
+    "email": "البريد الإلكتروني غير صحيح",
+    "minLength": "الحد الأدنى {n} أحرف",
+    "positiveAmount": "المبلغ يجب أن يكون أكبر من صفر"
+  }
+}

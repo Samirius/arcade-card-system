@@ -1,0 +1,115 @@
+@use './tokens.scss' as *;
+
+// ============================================
+// PRIMEVUE THEME OVERRIDES — Sindbad
+// ============================================
+
+:root {
+  // PrimeVue CSS variable mapping
+  --p-primary-color: #{$color-brand-primary};
+  --p-primary-contrast-color: #ffffff;
+  --p-primary-hover-color: #{$color-brand-primary-dark};
+  --p-primary-active-color: #{$color-brand-primary-dark};
+
+  --p-surface-0: #{$color-bg-surface};
+  --p-surface-50: #{$color-bg-muted};
+  --p-surface-100: #{$color-border};
+  --p-surface-200: #{$color-border-strong};
+  --p-surface-900: #{$color-bg-dark};
+
+  --p-text-color: #{$color-text-primary};
+  --p-text-muted-color: #{$color-text-secondary};
+  --p-content-border-color: #{$color-border};
+  --p-content-hover-background: #{$color-bg-hover};
+  --p-focus-ring-color: #{$color-brand-primary-light};
+
+  --p-border-radius: #{$radius-md};
+  --p-border-radius-sm: #{$radius-sm};
+  --p-border-radius-lg: #{$radius-lg};
+
+  // Form elements
+  --p-inputtext-background: #{$color-bg-surface};
+  --p-inputtext-border-color: #{$color-border-strong};
+  --p-inputtext-focus-border-color: #{$color-brand-primary};
+  --p-inputtext-hover-border-color: #{$color-brand-primary-light};
+  --p-inputtext-padding-x: #{$space-3};
+  --p-inputtext-padding-y: #{$space-2};
+
+  // Buttons
+  --p-button-border-radius: #{$radius-md};
+  --p-button-padding-x: #{$space-4};
+  --p-button-padding-y: #{$space-2};
+
+  // Card
+  --p-card-background: #{$color-bg-surface};
+  --p-card-border-color: #{$color-border};
+  --p-card-border-radius: #{$radius-lg};
+  --p-card-padding: #{$space-5};
+
+  // DataTable
+  --p-datatable-header-background: #{$color-bg-muted};
+  --p-datatable-row-hover-background: #{$color-bg-hover};
+  --p-datatable-border-color: #{$color-border};
+
+  // Dialog
+  --p-dialog-border-radius: #{$radius-lg};
+  --p-dialog-background: #{$color-bg-surface};
+}
+
+// --- Component-specific overrides ---
+
+// Buttons: use Tajawal font
+.p-button {
+  font-family: $font-arabic;
+  font-weight: 500;
+}
+
+// DataTables: clean look
+.p-datatable {
+  .p-datatable-thead > tr > th {
+    font-weight: 700;
+    font-size: $text-sm;
+    color: $color-text-secondary;
+    text-transform: none;
+    background: $color-bg-muted;
+    border-bottom: 1px solid $color-border;
+  }
+
+  .p-datatable-tbody > tr {
+    transition: background $transition-fast;
+
+    &:hover {
+      background: $color-bg-hover !important;
+    }
+  }
+}
+
+// Inputs: consistent style
+.p-inputtext, .p-textarea, .p-select {
+  font-family: $font-arabic;
+  font-size: $text-base;
+  border-radius: $radius-md;
+
+  &::placeholder {
+    color: $color-text-muted;
+  }
+}
+
+// Cards: subtle shadow
+.p-card {
+  box-shadow: $shadow-sm;
+  border: 1px solid $color-border;
+}
+
+// Toast/Message
+.p-toast {
+  font-family: $font-arabic;
+}
+
+// Tag/Badge sizing
+.p-tag {
+  font-size: $text-xs;
+  font-weight: 600;
+  border-radius: $radius-full;
+  padding: $space-1 $space-3;
+}

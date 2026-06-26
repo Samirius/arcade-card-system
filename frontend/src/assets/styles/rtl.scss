@@ -1,0 +1,56 @@
+@use './tokens.scss' as *;
+
+// ============================================
+// RTL-SPECIFIC OVERRIDES
+// Applied when dir="rtl" on root
+// ============================================
+
+[dir="rtl"] {
+  // Sidebar on the right in RTL
+  .app-sidebar {
+    order: 1;
+    border-right: none;
+    border-left: 1px solid $color-border;
+  }
+
+  .app-content {
+    order: 2;
+  }
+
+  // Flip icons that are directional
+  .pi.pi-arrow-right::before {
+    content: "\e90d"; // arrow-left
+  }
+
+  // Table text alignment
+  .p-datatable .p-datatable-thead > tr > th {
+    text-align: right;
+  }
+  .p-datatable .p-datatable-tbody > tr > td {
+    text-align: right;
+  }
+}
+
+[dir="ltr"] {
+  .app-sidebar {
+    order: 0;
+    border-right: 1px solid $color-border;
+    border-left: none;
+  }
+
+  .app-content {
+    order: 1;
+  }
+
+  .p-datatable .p-datatable-thead > tr > th {
+    text-align: left;
+  }
+  .p-datatable .p-datatable-tbody > tr > td {
+    text-align: left;
+  }
+}
+
+// Use logical properties everywhere for natural RTL/LTR
+// padding-inline-start / padding-inline-end instead of padding-left/right
+// margin-inline-start / margin-inline-end instead of margin-left/right
+// inset-inline-start / inset-inline-end instead of left/right
