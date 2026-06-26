@@ -1,19 +1,16 @@
 """Database connection and session management"""
-from sqlalchemy import create_engine, create_engine as _create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import os
+from app.config import settings
 
-# Use postgres superuser for now (simpler setup)
-DATABASE_URL = "postgresql:///arcade_management?host=/var/run/postgresql&port=5433"
-
-# Create engine
-engine = _create_engine(
-    DATABASE_URL,
+# Create engine from environment variable
+engine = create_engine(
+    settings.database_url,
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
-    echo=os.getenv("DEBUG", "false").lower() == "true"
+    echo=settings.debug
 )
 
 # Create session factory
