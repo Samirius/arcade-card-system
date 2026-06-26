@@ -334,10 +334,15 @@ async def verify_mfa_setup(
 
 @router.post("/logout")
 async def logout(
+    refresh_token: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Logout user."""
+    from app.models.refresh_token import RefreshTokenBlacklist
+    from app.utils.jwt import create_access_token
+    from hashlib import sha256
+
     # Invalidate all tokens by incrementing token version
     from sqlalchemy import text
     db.execute(
@@ -346,8 +351,22 @@ async def logout(
     )
     db.commit()
 
-    AuthService.logout_user(db, str(current_user.id))
-    return {"message": "Logged out successfully"}
+    # Blacklist the refresh token
+    token_hash = sha256(refresh_token.encode()).hexdigest()
+    expiry = datetime.utcnow() + timedelta(days=7)  # Refresh token expiry
+
+    blacklist_entry = RefreshTokenBlacklist(
+        token_hash=token_hash,
+        revoked_at=datetime.utcnow(),
+        expires_at=expiry,
+        user_id=str(current_user.id),
+        revocation_reason="LOGOUT"
+    )
+
+    db.add(blacklist_entry)
+    db.commit()
+
+    return {"message": "Logged out successfully", "tokens_revoked": True}
 
 
 @router.get("/me")

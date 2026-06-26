@@ -156,7 +156,7 @@ class User(Base):
 
     def reset_failed_login(self):
         """Reset failed login counter"""
-        self.failed_login_attempts = "0"
+        self.failed_login_attempts = 0
         self.last_failed_login = None
         if self.status == UserStatus.LOCKED:
             self.locked_until = None
