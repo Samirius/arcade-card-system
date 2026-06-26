@@ -10,7 +10,7 @@ class UserCreate(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
     phone: Optional[str] = Field(None, min_length=10, max_length=20)
-    role: Optional[str] = "STAFF"
+    # Note: role is NOT accepted from client - defaults to STAFF in backend
 
 
 class UserLogin(BaseModel):

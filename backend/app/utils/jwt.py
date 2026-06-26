@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
+from sqlalchemy.orm import Session
 from app.config import settings
 
 # JWT configuration
@@ -10,18 +11,23 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 REFRESH_TOKEN_EXPIRE_DAYS = settings.refresh_token_expire_days
 SECRET_KEY = settings.secret_key
 
-def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: Dict[str, Any], token_version: Optional[int] = None, expires_delta: Optional[timedelta] = None) -> str:
     """
     Create a JWT access token.
 
     Args:
         data: Data to encode in the token
+        token_version: User's token version for revocation checking
         expires_delta: Optional custom expiration time
 
     Returns:
         Encoded JWT token
     """
     to_encode = data.copy()
+
+    # Add token_version if provided
+    if token_version is not None:
+        to_encode["token_version"] = token_version
 
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -94,12 +100,13 @@ def verify_access_token(token: str) -> Optional[Dict[str, Any]]:
 
     return payload
 
-def verify_refresh_token(token: str) -> Optional[Dict[str, Any]]:
+def verify_refresh_token(token: str, db: Optional[Session] = None) -> Optional[Dict[str, Any]]:
     """
     Verify a refresh token and return the payload.
 
     Args:
         token: JWT refresh token
+        db: Database session to check blacklist
 
     Returns:
         Token payload or None if invalid
@@ -110,6 +117,20 @@ def verify_refresh_token(token: str) -> Optional[Dict[str, Any]]:
 
     if payload.get("type") != "refresh":
         return None
+
+    # Check blacklist if database provided
+    if db:
+        from app.models.refresh_token import RefreshTokenBlacklist
+        from hashlib import sha256
+
+        # Check if token is blacklisted
+        token_hash = sha256(token.encode()).hexdigest()
+        blacklisted = db.query(RefreshTokenBlacklist).filter(
+            RefreshTokenBlacklist.token_hash == token_hash
+        ).first()
+
+        if blacklisted:
+            return None
 
     return payload
 

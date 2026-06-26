@@ -149,7 +149,7 @@ class AuthService:
             "sub": str(user.id),
             "email": user.email,
             "role": user.role
-        })
+        }, token_version=user.token_version)
         refresh_token = create_refresh_token({
             "sub": str(user.id)
         })
@@ -205,10 +205,10 @@ class AuthService:
         db.commit()
 
         # Generate QR code URL
-        qr_code_url = generate_qr_code(
-            secret=user.mfa_secret,
+        qr_code_url = generate_mfa_qr_code(
             email=user.email,
-            issuer=settings.mfa_issuer
+            secret=user.mfa_secret,
+            issuer_name=settings.mfa_issuer
         )
 
         # Log MFA enablement
@@ -248,10 +248,10 @@ class AuthService:
         db.commit()
 
         # Generate QR code URL
-        qr_code_url = generate_qr_code(
-            secret=mfa_secret,
+        qr_code_url = generate_mfa_qr_code(
             email=user.email,
-            issuer=settings.mfa_issuer
+            secret=mfa_secret,
+            issuer_name=settings.mfa_issuer
         )
 
         return qr_code_url

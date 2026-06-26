@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.audit import AuditLog
+from app.models.audit import AuditLog, AuditAction
 
 
 # Setup file logging
@@ -44,8 +44,6 @@ def log_action(
         resource_id: ID of resource affected
     """
     try:
-        from app.models import AuditLog, AuditAction
-
         # Map action to AuditAction enum
         action_map = {
             'LOGIN': AuditAction.LOGIN,
@@ -57,6 +55,7 @@ def log_action(
             'CARD_ADD_CREDIT': AuditAction.CREATE,
             'CARD_CHARGE': AuditAction.CREATE,
             'TRANSACTION_CREATE': AuditAction.CREATE,
+            'CONFIG_CHANGE': AuditAction.CONFIG_CHANGE,
         }
 
         audit_action = action_map.get(action, AuditAction.UPDATE)
@@ -65,8 +64,10 @@ def log_action(
         audit_log = AuditLog(
             user_id=user_id,
             action=audit_action,
-            resource_type=resource_type or 'card',
+            resource_type=resource_type or 'system',
             resource_id=resource_id,
+            ip_address=None,  # Will be set from request if available
+            user_agent=None,
             old_values=None,
             new_values={'details': details} if details else None,
             success=True,
@@ -131,33 +132,39 @@ def log_audit(
 
     # Log to database
     try:
-        # Import here to avoid circular dependency
-        from sqlalchemy import text
+        from app.models.audit import AuditLog, AuditAction
 
-        query = text("""
-            INSERT INTO audit_logs (
-                user_id, action, resource_type, resource_id,
-                ip_address, user_agent, old_values, new_values,
-                success, error_message
-            ) VALUES (
-                :user_id, :action, :resource_type, :resource_id,
-                :ip_address, :user_agent, :old_values, :new_values,
-                :success, :error_message
-            )
-        """)
+        # Map action string to AuditAction enum
+        action_map = {
+            'LOGIN': AuditAction.LOGIN,
+            'LOGOUT': AuditAction.LOGOUT,
+            'CREATE': AuditAction.CREATE,
+            'READ': AuditAction.READ,
+            'UPDATE': AuditAction.UPDATE,
+            'DELETE': AuditAction.DELETE,
+            'TRANSACTION': AuditAction.TRANSACTION,
+            'REFUND': AuditAction.REFUND,
+            'CONFIG_CHANGE': AuditAction.CONFIG_CHANGE,
+            'FAILED_LOGIN': AuditAction.FAILED_LOGIN,
+        }
 
-        db.execute(query, {
-            'user_id': user_id,
-            'action': action,
-            'resource_type': resource_type,
-            'resource_id': resource_id,
-            'ip_address': ip_address,
-            'user_agent': user_agent,
-            'old_values': old_values,
-            'new_values': new_values,
-            'success': success,
-            'error_message': error_message
-        })
+        audit_action = action_map.get(action, AuditAction.OTHER if hasattr(AuditAction, 'OTHER') else AuditAction.UPDATE)
+
+        # Create audit log
+        audit_log = AuditLog(
+            user_id=user_id,
+            action=audit_action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            old_values=old_values,
+            new_values=new_values,
+            success=success,
+            error_message=error_message
+        )
+
+        db.add(audit_log)
         db.commit()
     except Exception as e:
         logger.error(f"Failed to log to database: {e}")
@@ -183,32 +190,34 @@ def get_audit_logs(
         List of audit log entries
     """
     try:
-        from sqlalchemy import text
+        from app.models.audit import AuditLog
 
-        query = text("""
-            SELECT
-                id, user_id, action, resource_type, resource_id,
-                ip_address, user_agent, old_values, new_values,
-                success, error_message, created_at
-            FROM audit_logs
-            WHERE 1=1
-        """)
-
-        params = {}
+        query = db.query(AuditLog)
 
         if user_id:
-            query = text(str(query) + " AND user_id = :user_id")
-            params['user_id'] = user_id
+            query = query.filter(AuditLog.user_id == user_id)
 
         if action:
-            query = text(str(query) + " AND action = :action")
-            params['action'] = action
+            query = query.filter(AuditLog.action == action)
 
-        query = text(str(query) + " ORDER BY created_at DESC LIMIT :limit")
-        params['limit'] = limit
+        logs = query.order_by(AuditLog.created_at.desc()).limit(limit).all()
 
-        result = db.execute(query, params)
-        return [dict(row) for row in result]
+        return [
+            {
+                "id": log.id,
+                "user_id": log.user_id,
+                "action": log.action.value if hasattr(log.action, 'value') else str(log.action),
+                "resource_type": log.resource_type,
+                "resource_id": str(log.resource_id) if log.resource_id else None,
+                "ip_address": log.ip_address,
+                "success": log.success,
+                "error_message": log.error_message,
+                "created_at": log.created_at,
+                "old_values": log.old_values,
+                "new_values": log.new_values
+            }
+            for log in logs
+        ]
 
     except Exception as e:
         logger.error(f"Failed to get audit logs: {e}")

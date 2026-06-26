@@ -397,7 +397,11 @@ async def charge_card(
 
     Used when a customer plays a game or uses a service.
     """
-    card = db.query(Card).filter(Card.card_uid == card_uid).first()
+    # Use row locking to prevent race conditions
+    card = db.query(Card).filter(
+        Card.card_uid == card_uid
+    ).with_for_update().first()
+
     if not card:
         raise HTTPException(status_code=404, detail="Card not found")
 

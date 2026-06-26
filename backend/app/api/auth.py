@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import re
 
 from app.database import get_db
-from app.models.user import User, UserRole
+from app.models.user import User, UserRole, UserStatus
 from app.schemas.user import UserCreate, UserResponse, UserLogin
 from app.services.auth import AuthService
 from app.config import settings
@@ -105,6 +105,20 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account not active"
         )
+
+    # Check token_version if present in token
+    token_version = payload.get("token_version")
+    if token_version is not None:
+        from app.models.user import User
+        current_version = db.query(User.token_version).filter(
+            User.id == user_id
+        ).scalar()
+
+        if current_version is None or token_version != current_version:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked"
+            )
 
     return user
 
