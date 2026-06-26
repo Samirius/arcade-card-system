@@ -1,45 +1,35 @@
-"""Audit logging system"""
+"""Audit logging utilities"""
 import logging
 from datetime import datetime
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
-from app.database import Base, get_db
 
-# Set up audit logger
-audit_logger = logging.getLogger("audit")
-audit_logger.setLevel(logging.INFO)
+from app.database import get_db
+from app.models import audit_logs  # This will be imported from models when created
 
-# File handler for audit logs
-audit_handler = logging.FileHandler("logs/audit.log")
-audit_handler.setLevel(logging.INFO)
-audit_formatter = logging.Formatter(
-    '%(asctime)s | %(levelname)s | %(message)s'
-)
-audit_handler.setFormatter(audit_formatter)
-audit_logger.addHandler(audit_handler)
 
-class AuditLog(Base):
-    """Audit log model for database"""
-    __tablename__ = "audit_logs"
+# Setup file logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
-    id = int
-    user_id = Optional[str]
-    action = str
-    resource_type = Optional[str]
-    resource_id = Optional[str]
-    ip_address = Optional[str]
-    user_agent = Optional[str]
-    old_values = Optional[Dict[str, Any]]
-    new_values = Optional[Dict[str, Any]]
-    success = bool
-    error_message = Optional[str]
-    created_at = datetime
+# Create file handler
+file_handler = logging.FileHandler('audit.log')
+file_handler.setLevel(logging.INFO)
 
-def log_audit_event(
-    user_id: Optional[str],
+# Create formatter
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+# Add handler to logger
+logger.addHandler(file_handler)
+
+
+def log_audit(
+    db: Session,
     action: str,
-    resource_type: Optional[str] = None,
+    resource_type: str,
     resource_id: Optional[str] = None,
+    user_id: Optional[str] = None,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
     old_values: Optional[Dict[str, Any]] = None,
@@ -48,95 +38,122 @@ def log_audit_event(
     error_message: Optional[str] = None
 ) -> None:
     """
-    Log an audit event.
+    Log audit entry to both file and database.
 
     Args:
-        user_id: ID of the user performing the action
-        action: Action being performed
-        resource_type: Type of resource (e.g., 'card', 'transaction')
-        resource_id: ID of the resource
-        ip_address: IP address of the request
+        db: Database session
+        action: Action performed (LOGIN, LOGOUT, CREATE, READ, UPDATE, DELETE, etc.)
+        resource_type: Type of resource affected
+        resource_id: ID of resource affected
+        user_id: ID of user who performed action
+        ip_address: IP address of request
         user_agent: User agent string
-        old_values: Old values (for updates)
+        old_values: Previous values (for UPDATE actions)
         new_values: New values
-        success: Whether the action was successful
+        success: Whether action was successful
         error_message: Error message if action failed
     """
     # Log to file
-    log_message = f"User: {user_id} | Action: {action} | Resource: {resource_type}:{resource_id} | Success: {success}"
+    log_entry = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'action': action,
+        'resource_type': resource_type,
+        'resource_id': resource_id,
+        'user_id': user_id,
+        'ip_address': ip_address,
+        'success': success,
+        'error_message': error_message
+    }
 
-    if not success and error_message:
-        log_message += f" | Error: {error_message}"
+    if old_values:
+        log_entry['old_values'] = old_values
 
-    audit_logger.info(log_message)
+    if new_values:
+        log_entry['new_values'] = new_values
 
-    # Log to database (if session available)
+    logger.info(f"AUDIT: {log_entry}")
+
+    # Log to database
     try:
-        # Get database session
-        from app.database import SessionLocal
-        db = SessionLocal()
+        # Import here to avoid circular dependency
+        from sqlalchemy import text
 
-        # Create audit log record
-        audit_log = AuditLog(
-            user_id=user_id,
-            action=action,
-            resource_type=resource_type,
-            resource_id=resource_id,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            old_values=old_values,
-            new_values=new_values,
-            success=success,
-            error_message=error_message,
-            created_at=datetime.utcnow()
-        )
+        query = text("""
+            INSERT INTO audit_logs (
+                user_id, action, resource_type, resource_id,
+                ip_address, user_agent, old_values, new_values,
+                success, error_message
+            ) VALUES (
+                :user_id, :action, :resource_type, :resource_id,
+                :ip_address, :user_agent, :old_values, :new_values,
+                :success, :error_message
+            )
+        """)
 
-        db.add(audit_log)
+        db.execute(query, {
+            'user_id': user_id,
+            'action': action,
+            'resource_type': resource_type,
+            'resource_id': resource_id,
+            'ip_address': ip_address,
+            'user_agent': user_agent,
+            'old_values': old_values,
+            'new_values': new_values,
+            'success': success,
+            'error_message': error_message
+        })
         db.commit()
-        db.close()
-
     except Exception as e:
-        # Don't fail the application if audit logging fails
-        audit_logger.error(f"Failed to log to database: {e}")
+        logger.error(f"Failed to log to database: {e}")
+        # Don't raise - we don't want to break the application due to logging failures
 
-def audit_decorator(action: str, resource_type: Optional[str] = None):
+
+def get_audit_logs(
+    db: Session,
+    user_id: Optional[str] = None,
+    action: Optional[str] = None,
+    limit: int = 100
+) -> list:
     """
-    Decorator for automatically logging function calls.
+    Get audit logs with optional filters.
 
     Args:
-        action: Action being performed
-        resource_type: Type of resource
+        db: Database session
+        user_id: Filter by user ID
+        action: Filter by action type
+        limit: Maximum number of logs to return
+
+    Returns:
+        List of audit log entries
     """
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            user_id = kwargs.get('user_id') or getattr(args[0], 'current_user_id', None)
-            resource_id = kwargs.get('id') or kwargs.get('resource_id')
+    try:
+        from sqlalchemy import text
 
-            try:
-                result = func(*args, **kwargs)
+        query = text("""
+            SELECT
+                id, user_id, action, resource_type, resource_id,
+                ip_address, user_agent, old_values, new_values,
+                success, error_message, created_at
+            FROM audit_logs
+            WHERE 1=1
+        """)
 
-                # Log successful action
-                log_audit_event(
-                    user_id=user_id,
-                    action=action,
-                    resource_type=resource_type,
-                    resource_id=resource_id,
-                    success=True
-                )
+        params = {}
 
-                return result
+        if user_id:
+            query = text(str(query) + " AND user_id = :user_id")
+            params['user_id'] = user_id
 
-            except Exception as e:
-                # Log failed action
-                log_audit_event(
-                    user_id=user_id,
-                    action=action,
-                    resource_type=resource_type,
-                    resource_id=resource_id,
-                    success=False,
-                    error_message=str(e)
-                )
-                raise
+        if action:
+            query = text(str(query) + " AND action = :action")
+            params['action'] = action
 
-        return wrapper
-    return decorator
+        query = text(str(query) + " ORDER BY created_at DESC LIMIT :limit")
+        params['limit'] = limit
+
+        result = db.execute(query, params)
+        return [dict(row) for row in result]
+
+    except Exception as e:
+        logger.error(f"Failed to get audit logs: {e}")
+        return []

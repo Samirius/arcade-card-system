@@ -1,16 +1,44 @@
 """FastAPI application with security"""
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 
+from app.config import settings
 from app.utils.cors import configure_cors
 from app.utils.security import security_middleware
+from app.api.auth import router as auth_router
+from app.database import engine, Base
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events"""
+    # Startup
+    print("🚀 Starting Arcade Management System...")
+    print(f"📊 Environment: {settings.environment}")
+    print(f"🔒 Debug mode: {settings.debug}")
+
+    # Create database tables
+    try:
+        print("📦 Creating database tables...")
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database tables created successfully")
+    except Exception as e:
+        print(f"❌ Error creating database tables: {e}")
+
+    yield
+
+    # Shutdown
+    print("🛑 Shutting down Arcade Management System...")
+
 
 # Create FastAPI app
 app = FastAPI(
     title="Arcade Management System",
     version="1.0.0",
-    description="Secure arcade card management system",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    description="Secure arcade card management system with authentication and MFA",
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
+    lifespan=lifespan
 )
 
 # Configure CORS
@@ -19,6 +47,10 @@ configure_cors(app)
 # Add security middleware
 app.middleware("http")(security_middleware)
 
+# Include auth routes
+app.include_router(auth_router)
+
+
 @app.get("/")
 async def root():
     """Root endpoint"""
@@ -26,18 +58,31 @@ async def root():
         "message": "Arcade Management System",
         "version": "1.0.0",
         "status": "running",
-        "phase": "Phase 0 - Day 3 Complete: Project Structure"
+        "phase": "Phase 1 - Authentication Complete",
+        "api_versions": ["v1"],
+        "endpoints": {
+            "health": "/health",
+            "auth": "/api/v1/auth/*",
+            "docs": "/docs" if settings.debug else "disabled in production"
+        }
     }
+
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint for load balancers and monitoring"""
     return {
         "status": "healthy",
         "service": "Arcade Management System",
+        "version": "1.0.0",
+        "api_version": "v1",
+        "phase": "Phase 1 - Authentication Complete",
+        "security": "enabled",
+        "authentication": "enabled",
         "database": "connected",
-        "security": "enabled"
+        "environment": settings.environment
     }
+
 
 @app.get("/security-info")
 async def security_info():
@@ -45,23 +90,42 @@ async def security_info():
     return {
         "security_features": {
             "password_hashing": "bcrypt (12 rounds, 72-byte limit)",
-            "jwt_tokens": "enabled",
-            "mfa": "available",
-            "audit_logging": "enabled",
-            "rate_limiting": "100 req/min",
-            "cors": "restricted",
+            "jwt_tokens": "access + refresh tokens",
+            "mfa": "TOTP with QR codes and backup codes",
+            "audit_logging": "database + file logging",
+            "rate_limiting": "user-based + IP-based",
+            "cors": "environment-aware",
             "security_headers": "10+ headers (CSP, HSTS, Permissions-Policy, etc.)",
             "input_validation": "Pydantic schemas",
-            "api_versioning": "v1 prefix",
+            "api_versioning": "/api/v1/",
             "database_ssl": "required in production"
-        }
+        },
+        "authentication": {
+            "endpoints": [
+                "/api/v1/auth/register",
+                "/api/v1/auth/login",
+                "/api/v1/auth/login/mfa",
+                "/api/v1/auth/refresh",
+                "/api/v1/auth/mfa/setup/initiate",
+                "/api/v1/auth/mfa/setup/verify",
+                "/api/v1/auth/logout",
+                "/api/v1/auth/me"
+            ],
+            "token_expiry": {
+                "access_token": f"{settings.access_token_expire_minutes} minutes",
+                "refresh_token": f"{settings.refresh_token_expire_days} days"
+            }
+        },
+        "environment": settings.environment,
+        "debug_mode": settings.debug
     }
+
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
+        host=settings.host,
+        port=settings.port,
+        reload=settings.debug
     )
