@@ -1,14 +1,17 @@
 """Authentication API routes"""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 from typing import Optional
+from datetime import datetime, timedelta
 
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserResponse, UserLogin
 from app.services.auth import AuthService
 from app.config import settings
+import hashlib
 
 # Create router
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
@@ -88,6 +91,7 @@ async def register_user(
 
 @router.post("/login")
 async def login(
+    request: Request,
     login_data: UserLogin,
     db: Session = Depends(get_db)
 ):
@@ -104,10 +108,12 @@ async def login(
     Client should then call `/mfa/verify` with the MFA code.
     """
     try:
+        client_ip = request.client.host
         user, access_token, refresh_token = AuthService.authenticate_user(
             db=db,
             email=login_data.email,
-            password=login_data.password
+            password=login_data.password,
+            client_ip=client_ip
         )
 
         return {
@@ -232,7 +238,6 @@ async def initiate_mfa_setup(
 
         return {
             "qr_code_url": qr_code_url,
-            "secret": current_user.mfa_secret,
             "message": "Scan QR code with authenticator app, then verify with /mfa/setup/verify"
         }
     except ValueError as e:
