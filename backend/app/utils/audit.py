@@ -24,6 +24,62 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 
+def log_action(
+    db: Session,
+    user_id: str,
+    action: str,
+    details: str = None,
+    resource_type: str = None,
+    resource_id: str = None
+) -> None:
+    """
+    Log audit entry to database.
+
+    Args:
+        db: Database session
+        user_id: ID of user who performed action
+        action: Action performed (LOGIN, LOGOUT, CARD_CREATE, etc.)
+        details: Action details
+        resource_type: Type of resource affected
+        resource_id: ID of resource affected
+    """
+    try:
+        from app.models import AuditLog, AuditAction
+
+        # Map action to AuditAction enum
+        action_map = {
+            'LOGIN': AuditAction.LOGIN,
+            'LOGOUT': AuditAction.LOGOUT,
+            'CARD_CREATE': AuditAction.CREATE,
+            'CARD_UPDATE': AuditAction.UPDATE,
+            'CARD_ACTIVATE': AuditAction.UPDATE,
+            'CARD_DEACTIVATE': AuditAction.UPDATE,
+            'CARD_ADD_CREDIT': AuditAction.CREATE,
+            'CARD_CHARGE': AuditAction.CREATE,
+            'TRANSACTION_CREATE': AuditAction.CREATE,
+        }
+
+        audit_action = action_map.get(action, AuditAction.UPDATE)
+
+        # Create audit log
+        audit_log = AuditLog(
+            user_id=user_id,
+            action=audit_action,
+            resource_type=resource_type or 'card',
+            resource_id=resource_id,
+            old_values=None,
+            new_values={'details': details} if details else None,
+            success=True,
+            error_message=None
+        )
+
+        db.add(audit_log)
+        db.commit()
+    except Exception as e:
+        logger.error(f"Failed to log to database: {e}")
+        # Don't raise - we don't want to break the application due to logging failures
+
+
 def log_audit(
     db: Session,
     action: str,

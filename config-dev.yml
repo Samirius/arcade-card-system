@@ -1,0 +1,12 @@
+# Arcade Management System - Tunnel Configuration
+
+# Development / Internal Tunnel
+# Maps localhost:8000 to a public URL
+# Only accessible through cloudflared
+
+ingress:
+  - hostname: arcade-management-local.mauve-moondust-e93b.workers.dev
+    service: http://localhost:8000
+
+  # Catch-all for testing
+  - service: http_status:404

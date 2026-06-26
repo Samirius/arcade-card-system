@@ -2,6 +2,11 @@
 from app.models.user import User, UserRole, UserStatus
 from app.models.card import Card, CardType, CardStatus, Transaction
 from app.models.audit import AuditLog, AuditAction
+from app.models.refresh_token import RefreshTokenBlacklist
+from app.models.customer import Customer
+from app.models.location import Location, LocationStatus
+from app.models.machine import Machine, MachineType, MachineStatus
+from app.models.company import Company, SubscriptionTier, Region
 
 __all__ = [
     "User",
@@ -13,4 +18,14 @@ __all__ = [
     "Transaction",
     "AuditLog",
     "AuditAction",
+    "RefreshToken",
+    "Customer",
+    "Location",
+    "LocationStatus",
+    "Machine",
+    "MachineType",
+    "MachineStatus",
+    "Company",
+    "SubscriptionTier",
+    "Region",
 ]

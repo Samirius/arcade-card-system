@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arcade Kashier Kiosk</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --dark: #1f2937;
+            --light: #f9fafb;
+            --gray: #6b7280;
+            --border: #e5e7eb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .kiosk-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            width: 100%;
+            max-width: 900px;
+            overflow: hidden;
+        }
+
+        .kiosk-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .kiosk-header h1 {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .kiosk-header .location {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .kiosk-header .logout {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .kiosk-header .logout:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .kiosk-content {
+            padding: 30px;
+        }
+
+        .scan-section {
+            margin-bottom: 30px;
+        }
+
+        .scan-section h2 {
+            font-size: 20px;
+            color: var(--dark);
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .scan-input {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .scan-input input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .scan-input input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .scan-input button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .scan-input button:hover {
+            background: var(--primary-dark);
+        }
+
+        .camera-button {
+            background: var(--secondary);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .camera-button:hover {
+            opacity: 0.9;
+        }
+
+        .card-info {
+            background: var(--light);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            display: none;
+        }
+
+        .card-info.active {
+            display: block;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card-info h3 {
+            font-size: 18px;
+            color: var(--dark);
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .balance-display {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .balance-display .label {
+            font-size: 14px;
+            color: var(--gray);
+            margin-bottom: 5px;
+        }
+
+        .balance-display .amount {
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .card-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .card-detail {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .card-detail .label {
+            font-size: 12px;
+            color: var(--gray);
+            margin-bottom: 5px;
+        }
+
+        .card-detail .value {
+            font-size: 14px;
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        .actions-section {
+            margin-bottom: 30px;
+        }
+
+        .actions-section h2 {
+            font-size: 20px;
+            color: var(--dark);
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .credit-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .credit-button {
+            background: white;
+            border: 2px solid var(--border);
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 24px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: var(--dark);
+        }
+
+        .credit-button:hover {
+            border-color: var(--primary);
+            background: var(--light);
+            transform: translateY(-2px);
+        }
+
+        .credit-button.selected {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .custom-amount {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .custom-amount input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .custom-amount button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .confirm-button {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .confirm-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .confirm-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .transactions-section {
+            margin-bottom: 20px;
+        }
+
+        .transactions-section h2 {
+            font-size: 20px;
+            color: var(--dark);
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .transaction-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .transaction-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--border);
+        }
+
+        .transaction-item .type {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .transaction-item .type.add {
+            color: var(--secondary);
+        }
+
+        .transaction-item .type.deduct {
+            color: var(--danger);
+        }
+
+        .transaction-item .time {
+            font-size: 12px;
+            color: var(--gray);
+        }
+
+        .transaction-item .amount {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .transaction-item .amount.add {
+            color: var(--secondary);
+        }
+
+        .transaction-item .amount.deduct {
+            color: var(--danger);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading-spinner {
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            border-left: 4px solid var(--danger);
+        }
+
+        .success-message {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            border-left: 4px solid var(--secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="kiosk-container">
+        <div class="kiosk-header">
+            <div>
+                <h1>🎮 Arcade Kashier</h1>
+                <div class="location">📍 Downtown Arcade | 👤 Ahmed</div>
+            </div>
+            <button class="logout" id="logoutBtn">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </div>
+
+        <div class="kiosk-content">
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+
+            <div class="scan-section">
+                <h2>🔍 Scan Card</h2>
+                <div class="scan-input">
+                    <input
+                        type="text"
+                        id="cardUid"
+                        placeholder="Enter card UID or scan QR code"
+                        autocomplete="off"
+                    >
+                    <button id="scanBtn">
+                        <i class="fas fa-search"></i> Scan
+                    </button>
+                </div>
+                <button class="camera-button">
+                    <i class="fas fa-camera"></i> Use Camera
+                </button>
+            </div>
+
+            <div class="card-info" id="cardInfo">
+                <h3>💰 Card Balance</h3>
+                <div class="balance-display">
+                    <div class="label">Current Balance</div>
+                    <div class="amount" id="cardBalance">EGP 0.00</div>
+                </div>
+                <div class="card-details">
+                    <div class="card-detail">
+                        <div class="label">Card UID</div>
+                        <div class="value" id="cardUidDisplay">-</div>
+                    </div>
+                    <div class="card-detail">
+                        <div class="label">Owner</div>
+                        <div class="value" id="cardOwner">-</div>
+                    </div>
+                    <div class="card-detail">
+                        <div class="label">Card Type</div>
+                        <div class="value" id="cardType">-</div>
+                    </div>
+                    <div class="card-detail">
+                        <div class="label">Status</div>
+                        <div class="value" id="cardStatus">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions-section" id="actionsSection" style="display: none;">
+                <h2>➕ Add Credit (EGP)</h2>
+                <div class="credit-buttons">
+                    <button class="credit-button" data-amount="10">10</button>
+                    <button class="credit-button" data-amount="20">20</button>
+                    <button class="credit-button" data-amount="50">50</button>
+                    <button class="credit-button" data-amount="100">100</button>
+                </div>
+                <div class="custom-amount">
+                    <input
+                        type="number"
+                        id="customAmount"
+                        placeholder="Custom amount"
+                        min="1"
+                        step="1"
+                    >
+                    <button id="addCustomCredit">Add</button>
+                </div>
+                <button class="confirm-button" id="confirmAddCredit" disabled>
+                    <i class="fas fa-check-circle"></i> Add Credit
+                </button>
+            </div>
+
+            <div class="transactions-section" id="transactionsSection" style="display: none;">
+                <h2>📜 Recent Transactions</h2>
+                <div class="transaction-list" id="transactionList">
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        let accessToken = localStorage.getItem('accessToken');
+        let currentCardUid = null;
+        let selectedAmount = null;
+
+        // Check authentication
+        if (!accessToken) {
+            window.location.href = 'index.html';
+        }
+
+        // Logout handler
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            window.location.href = 'index.html';
+        });
+
+        // Show messages
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            setTimeout(() => errorEl.style.display = 'none', 5000);
+        }
+
+        function showSuccess(message) {
+            const successEl = document.getElementById('successMessage');
+            successEl.textContent = message;
+            successEl.style.display = 'block';
+            setTimeout(() => successEl.style.display = 'none', 3000);
+        }
+
+        // Scan card
+        document.getElementById('scanBtn').addEventListener('click', async () => {
+            const cardUid = document.getElementById('cardUid').value.trim();
+            if (!cardUid) {
+                showError('Please enter a card UID');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/cards/${cardUid}/balance`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const cardData = await response.json();
+                    currentCardUid = cardUid;
+
+                    // Update UI
+                    document.getElementById('cardBalance').textContent = `EGP ${cardData.balance.toFixed(2)}`;
+                    document.getElementById('cardUidDisplay').textContent = cardData.card_uid;
+                    document.getElementById('cardOwner').textContent = cardData.owner;
+                    document.getElementById('cardType').textContent = cardData.card_type;
+                    document.getElementById('cardStatus').textContent = cardData.status;
+
+                    // Show sections
+                    document.getElementById('cardInfo').classList.add('active');
+                    document.getElementById('actionsSection').style.display = 'block';
+                    document.getElementById('transactionsSection').style.display = 'block';
+
+                    // Load transactions
+                    loadCardTransactions(cardUid);
+                } else {
+                    showError('Card not found');
+                }
+            } catch (error) {
+                console.error('Scan error:', error);
+                showError('Error scanning card');
+            }
+        });
+
+        // Credit button selection
+        document.querySelectorAll('.credit-button').forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove selection from all buttons
+                document.querySelectorAll('.credit-button').forEach(btn => btn.classList.remove('selected'));
+
+                // Add selection to clicked button
+                button.classList.add('selected');
+                selectedAmount = parseFloat(button.dataset.amount);
+
+                // Enable confirm button
+                document.getElementById('confirmAddCredit').disabled = false;
+            });
+        });
+
+        // Custom amount
+        document.getElementById('addCustomCredit').addEventListener('click', () => {
+            const customAmount = parseFloat(document.getElementById('customAmount').value);
+            if (!customAmount || customAmount <= 0) {
+                showError('Please enter a valid amount');
+                return;
+            }
+
+            selectedAmount = customAmount;
+
+            // Remove selection from preset buttons
+            document.querySelectorAll('.credit-button').forEach(btn => btn.classList.remove('selected'));
+
+            // Enable confirm button
+            document.getElementById('confirmAddCredit').disabled = false;
+        });
+
+        // Confirm add credit
+        document.getElementById('confirmAddCredit').addEventListener('click', async () => {
+            if (!currentCardUid || !selectedAmount) {
+                showError('Please select a card and amount');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/cards/${currentCardUid}/add-credit?payment_method=CASH`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        amount: selectedAmount,
+                        notes: 'Cash payment at kiosk'
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+
+                    showSuccess(`Successfully added EGP ${selectedAmount} to card!`);
+                    document.getElementById('cardBalance').textContent = `EGP ${result.new_balance.toFixed(2)}`;
+
+                    // Reset selection
+                    selectedAmount = null;
+                    document.querySelectorAll('.credit-button').forEach(btn => btn.classList.remove('selected'));
+                    document.getElementById('customAmount').value = '';
+                    document.getElementById('confirmAddCredit').disabled = false;
+
+                    // Reload transactions
+                    loadCardTransactions(currentCardUid);
+                } else {
+                    const error = await response.json();
+                    showError(error.detail || 'Failed to add credit');
+                }
+            } catch (error) {
+                console.error('Add credit error:', error);
+                showError('Error adding credit');
+            }
+        });
+
+        // Load card transactions
+        async function loadCardTransactions(cardUid) {
+            try {
+                const response = await fetch(`${API_BASE}/cards/${cardUid}/transactions?limit=10`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const transactions = await response.json();
+
+                    if (transactions.length === 0) {
+                        document.getElementById('transactionList').innerHTML = `
+                            <div style="text-align: center; padding: 20px; color: var(--gray);">
+                                <i class="fas fa-receipt" style="font-size: 32px; margin-bottom: 10px; opacity: 0.5;"></i>
+                                <p>No transactions yet</p>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    const transactionsHTML = transactions.map(t => `
+                        <div class="transaction-item">
+                            <div>
+                                <div class="type ${t.transaction_type === 'ADD' ? 'add' : 'deduct'}">
+                                    ${t.transaction_type}
+                                </div>
+                                <div class="time">${new Date(t.created_at).toLocaleString()}</div>
+                            </div>
+                            <div class="amount ${t.transaction_type === 'ADD' ? 'add' : 'deduct'}">
+                                ${t.transaction_type === 'ADD' ? '+' : '-'}EGP ${t.amount.toFixed(2)}
+                            </div>
+                        </div>
+                    `).join('');
+
+                    document.getElementById('transactionList').innerHTML = transactionsHTML;
+                }
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+                document.getElementById('transactionList').innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: var(--gray);">
+                        <i class="fas fa-exclamation-circle" style="font-size: 32px; margin-bottom: 10px; opacity: 0.5;"></i>
+                        <p>Error loading transactions</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Enter key to scan
+        document.getElementById('cardUid').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('scanBtn').click();
+            }
+        });
+    </script>
+</body>
+</html>

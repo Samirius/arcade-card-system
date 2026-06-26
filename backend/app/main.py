@@ -8,6 +8,9 @@ from app.config import settings
 from app.utils.cors import configure_cors
 from app.utils.security import security_middleware
 from app.api.auth import router as auth_router
+from app.api.cards import router as cards_router
+from app.api.transactions import router as transactions_router
+from app.api.dashboard import router as dashboard_router
 from app.database import engine, Base
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -59,8 +62,11 @@ configure_cors(app)
 # Add security middleware
 app.middleware("http")(security_middleware)
 
-# Include auth routes
+# Include routers
 app.include_router(auth_router)
+app.include_router(cards_router)
+app.include_router(transactions_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/")
