@@ -1,0 +1,22 @@
+{
+  "A1B2C3D4": {
+    "uid": "A1B2C3D4",
+    "balance": 25.0,
+    "owner": "Alice"
+  },
+  "11223344": {
+    "uid": "11223344",
+    "balance": 15.5,
+    "owner": "Bob"
+  },
+  "AA55BBCC": {
+    "uid": "AA55BBCC",
+    "balance": 0.0,
+    "owner": "Charlie"
+  },
+  "00112233": {
+    "uid": "00112233",
+    "balance": 50.0,
+    "owner": "Diana"
+  }
+}
