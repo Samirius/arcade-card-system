@@ -65,14 +65,15 @@ configure_cors(app)
 # Add security middleware
 app.middleware("http")(security_middleware)
 
-# Include routers
-app.include_router(auth_router)
-app.include_router(cards_router)
-app.include_router(transactions_router)
-app.include_router(dashboard_router)
-app.include_router(companies_router)
-app.include_router(balance_router)
-app.include_router(offline_router)
+# Include routers (all under /api/v1 prefix for consistency)
+api_prefix = "/api/v1"
+app.include_router(auth_router, prefix=api_prefix)
+app.include_router(cards_router, prefix=api_prefix)
+app.include_router(transactions_router, prefix=api_prefix)
+app.include_router(dashboard_router, prefix=api_prefix)
+app.include_router(companies_router, prefix=api_prefix)
+app.include_router(balance_router, prefix=api_prefix)
+app.include_router(offline_router, prefix=api_prefix)
 
 
 @app.get("/")

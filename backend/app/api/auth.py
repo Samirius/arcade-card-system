@@ -14,7 +14,7 @@ from app.services.auth import AuthService
 from app.config import settings
 
 # Create router
-router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # Security
 security = HTTPBearer(auto_error=False)
