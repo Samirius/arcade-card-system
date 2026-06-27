@@ -121,6 +121,10 @@ class AuthService:
             raise ValueError("Account is not active. Please contact administrator.")
 
         # Verify password
+        # DEBUG
+        print(f"[AUTH DEBUG] Email: {email}, Password length: {len(password)}, First char: {password[0] if password else 'NONE'}")
+        print(f"[AUTH DEBUG] Stored hash: {user.password_hash}")
+        print(f"[AUTH DEBUG] Verify result: {verify_password(password, user.password_hash)}")
         if not verify_password(password, user.password_hash):
             user.increment_failed_login()
             db.commit()

@@ -93,7 +93,8 @@ router.beforeEach(async (to, from, next) => {
   // Role check
   if (to.meta.roles && auth.isAuthenticated) {
     const userRole = auth.role
-    if (userRole && !to.meta.roles.includes(userRole)) {
+    const allowedRoles = to.meta.roles as string[]
+    if (userRole && !allowedRoles.includes(userRole)) {
       return next(auth.redirectAfterLogin())
     }
   }

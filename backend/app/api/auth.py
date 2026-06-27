@@ -1,5 +1,6 @@
 """Authentication API routes"""
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
+from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
@@ -212,18 +213,22 @@ async def login(
 @router.post("/login/mfa")
 async def login_with_mfa(
     request: Request,
-    login_data: UserLogin,
-    mfa_request: MFAVerifyRequest,
+    body: dict = Body(default={}),
     db: Session = Depends(get_db)
 ):
     """Login with email, password, and MFA code."""
     try:
+        login_data = UserLogin(
+            email=body["email"],
+            password=body["password"]
+        )
+        mfa_code = body.get("mfa_code", "")
         client_ip = request.client.host if request.client else "unknown"
         user, access_token, refresh_token = AuthService.authenticate_user(
             db=db,
             email=login_data.email,
             password=login_data.password,
-            mfa_code=mfa_request.mfa_code,
+            mfa_code=mfa_code,
             client_ip=client_ip
         )
 
@@ -254,14 +259,30 @@ async def login_with_mfa(
 
 @router.post("/refresh")
 async def refresh_token(
-    refresh_token: str,
-    db: Session = Depends(get_db)
+    request: Request,
+    db: Session = Depends(get_db),
+    body: dict = Body(default={}),
 ):
-    """Refresh access token using refresh token."""
+    """Refresh access token using refresh token from body or cookie."""
     try:
+        # Try body first, then cookie
+        refresh_token_str = body.get("refresh_token")
+        if not refresh_token_str:
+            refresh_token_str = request.cookies.get("refresh_token")
+        if not refresh_token_str:
+            # Try Authorization header
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                refresh_token_str = auth_header[7:]
+        if not refresh_token_str:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="No refresh token provided"
+            )
+
         user, access_token = AuthService.refresh_token(
             db=db,
-            refresh_token_str=refresh_token
+            refresh_token_str=refresh_token_str
         )
 
         return {

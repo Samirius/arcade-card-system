@@ -14,6 +14,7 @@ from app.schemas.business import (
 )
 from app.utils.audit import log_action
 from app.api.authorization import require_role
+from app.api.auth import get_current_user
 
 router = APIRouter(prefix="/cards", tags=["cards"])
 
@@ -163,6 +164,70 @@ async def get_cards_summary(
         "card_type_counts": card_type_counts,
         "total_balance": total_balance_sum
     }
+
+
+@router.get("/me", response_model=CardResponse)
+async def get_my_card(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get the current user's card (customer portal).
+    Matches card by owner field = user's email or full name.
+    """
+    card = (
+        db.query(Card)
+        .filter(Card.owner.in_([current_user.email, getattr(current_user, 'full_name', '')]))
+        .filter(Card.status == CardStatus.ACTIVE)
+        .first()
+    )
+    if not card:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active card found for your account"
+        )
+    return card
+
+
+@router.get("/me/transactions", response_model=List[dict])
+async def get_my_transactions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get transactions for the current user's card (customer portal).
+    """
+    card = (
+        db.query(Card)
+        .filter(Card.owner.in_([current_user.email, getattr(current_user, 'full_name', '')]))
+        .filter(Card.status == CardStatus.ACTIVE)
+        .first()
+    )
+    if not card:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active card found for your account"
+        )
+    transactions = (
+        db.query(Transaction)
+        .filter(Transaction.card_uid == card.card_uid)
+        .order_by(Transaction.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    return [
+        {
+            "id": str(t.id),
+            "card_uid": t.card_uid,
+            "amount": float(t.amount),
+            "transaction_type": t.transaction_type,
+            "type": t.transaction_type,
+            "payment_method": t.payment_method,
+            "notes": t.notes,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+        }
+        for t in transactions
+    ]
 
 
 @router.get("/{card_uid}", response_model=CardResponse)

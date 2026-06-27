@@ -15,6 +15,27 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// --- Response interceptor: normalize card field names ---
+function normalizeCardFields(data: any): any {
+  if (!data || typeof data !== 'object') return data
+  if (Array.isArray(data)) return data.map(normalizeCardFields)
+  const normalized = { ...data }
+  // Map backend snake_case / different names to frontend expectations
+  if ('card_uid' in normalized && !('uid' in normalized)) {
+    normalized.uid = normalized.card_uid
+  }
+  if ('owner' in normalized && !('customer_name' in normalized)) {
+    normalized.customer_name = normalized.owner
+  }
+  if ('card_type' in normalized && !('type' in normalized)) {
+    normalized.type = normalized.card_type
+  }
+  if ('transaction_type' in normalized && !('type' in normalized)) {
+    normalized.type = normalized.transaction_type
+  }
+  return normalized
+}
+
 // --- Response interceptor: auto-refresh on 401 ---
 let isRefreshing = false
 let failedQueue: Array<{ resolve: Function; reject: Function }> = []
@@ -31,7 +52,13 @@ function processQueue(error: any, token: string | null) {
 }
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Normalize field names for frontend consumption
+    if (response.data) {
+      response.data = normalizeCardFields(response.data)
+    }
+    return response
+  },
   async (error) => {
     const originalRequest = error.config
 

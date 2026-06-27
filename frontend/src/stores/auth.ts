@@ -12,6 +12,18 @@ export interface User {
   mfa_enabled: boolean
 }
 
+function normalizeUser(raw: any): User {
+  return {
+    id: raw.id,
+    email: raw.email,
+    full_name: raw.full_name || [raw.first_name, raw.last_name].filter(Boolean).join(' ') || raw.email,
+    role: raw.role,
+    status: raw.status,
+    company_id: raw.company_id,
+    mfa_enabled: raw.mfa_enabled ?? false,
+  }
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const accessToken = ref<string | null>(null)
@@ -19,6 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref<string | null>(null)
   const mfaRequired = ref(false)
   const pendingEmail = ref<string | null>(null)
+  const pendingPassword = ref<string | null>(null)
 
   const isAuthenticated = computed(() => !!accessToken.value)
   const role = computed(() => user.value?.role || null)
@@ -58,13 +71,16 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     try {
       const res = await api.post('/api/v1/auth/login', { email, password })
-      if (res.data.mfa_required) {
+      // Backend returns 'requires_mfa', frontend uses 'mfa_required'
+      const mfaRequired = res.data.mfa_required ?? res.data.requires_mfa ?? false
+      if (mfaRequired) {
         mfaRequired.value = true
         pendingEmail.value = email
+        pendingPassword.value = password
         return { mfaRequired: true }
       }
       setToken(res.data.access_token)
-      user.value = res.data.user
+      user.value = normalizeUser(res.data.user)
       return { mfaRequired: false }
     } catch (err: any) {
       error.value = err.response?.data?.detail || 'Login failed'
@@ -80,12 +96,14 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await api.post('/api/v1/auth/login/mfa', {
         email: pendingEmail.value,
+        password: pendingPassword.value,
         mfa_code: code,
       })
       setToken(res.data.access_token)
-      user.value = res.data.user
+      user.value = normalizeUser(res.data.user)
       mfaRequired.value = false
       pendingEmail.value = null
+      pendingPassword.value = null
     } catch (err: any) {
       error.value = err.response?.data?.detail || 'MFA verification failed'
       throw err
@@ -97,7 +115,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchUser() {
     try {
       const res = await api.get('/api/v1/auth/me')
-      user.value = res.data
+      user.value = normalizeUser(res.data)
     } catch {
       clearToken()
     }

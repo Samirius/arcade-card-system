@@ -15,7 +15,7 @@ const uid = route.params.uid as string
 const loading = ref(true)
 const card = ref<any>(null)
 const transactions = ref<any[]>([])
-const activeTab = ref(0)
+const activeTab = ref('0')
 
 // Add credit dialog
 const showAddCredit = ref(false)
@@ -154,13 +154,13 @@ onMounted(loadCard)
       </div>
 
       <!-- Tabs -->
-      <Tabs v-model:active-index="activeTab">
+      <Tabs v-model:value="activeTab">
         <TabList>
-          <Tab>{{ t('card.transactions') }}</Tab>
-          <Tab>{{ t('card.balanceHistory') }}</Tab>
+          <Tab :value="'0'">{{ t('card.transactions') }}</Tab>
+          <Tab :value="'1'">{{ t('card.balanceHistory') }}</Tab>
         </TabList>
         <TabPanels>
-          <TabPanel>
+          <TabPanel :value="'0'">
             <DataTable :value="transactions" striped-rows :empty-message="t('transaction.noTransactions')">
               <Column field="created_at" :header="t('transaction.date')">
                 <template #body="{ data }">
@@ -183,7 +183,7 @@ onMounted(loadCard)
               </Column>
             </DataTable>
           </TabPanel>
-          <TabPanel>
+          <TabPanel :value="'1'">
             <div class="empty-tab">
               {{ t('common.noData') }}
             </div>
