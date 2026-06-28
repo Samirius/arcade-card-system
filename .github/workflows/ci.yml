@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: arcade_user
+          POSTGRES_PASSWORD: arcade_password
+          POSTGRES_DB: arcade_management
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://arcade_user:arcade_password@localhost:5432/arcade_management
+      SECRET_KEY: ci_test_secret_key_0123456789_abcdef
+      ENVIRONMENT: development
+      DEBUG: "false"
+      CORS_ORIGINS: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install email-validator "qrcode[pil]" slowapi pytest httpx==0.25.2 requests pyotp
+
+      - name: Run verification harness
+        working-directory: backend
+        run: PYTHONPATH=. python tests_integration/run_verification.py
+
+      - name: Run concurrency test
+        working-directory: backend
+        run: PYTHONPATH=. python tests_integration/conc_db.py
+
+      - name: Run migration check
+        working-directory: backend
+        run: bash tests_integration/check_migrations.sh "$DATABASE_URL"
