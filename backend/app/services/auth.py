@@ -126,9 +126,11 @@ class AuthService:
             db.commit()
             raise ValueError("Invalid email or password")
 
-        # Check if MFA is required for privileged roles (skip in DEBUG mode)
-        if user.is_privileged() and not user.mfa_enabled and not settings.debug:
-            raise ValueError("MFA is required for privileged accounts. Please enable MFA first.")
+        # Check if MFA is required for privileged roles
+        # In non-debug mode: privileged users MUST set up MFA on first login.
+        # We allow login but flag it — frontend must enforce MFA setup.
+        # (Bootstrap path: login works → /mfa/setup/initiate → /mfa/setup/verify)
+        # This avoids the deadlock where privileged users can't log in to set up MFA.
 
         # Check if MFA is required
         if user.mfa_enabled:

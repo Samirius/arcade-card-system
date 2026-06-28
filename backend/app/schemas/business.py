@@ -184,7 +184,7 @@ class BalanceAddResponse(BaseModel):
     card_uid: str
     old_balance: Decimal
     new_balance: Decimal
-    transaction_id: uuid.UUID
+    transaction_id: Optional[uuid.UUID] = None
 
 
 class BalanceChargeResponse(BaseModel):
@@ -195,7 +195,7 @@ class BalanceChargeResponse(BaseModel):
     old_balance: Decimal
     new_balance: Decimal
     amount_charged: Decimal
-    transaction_id: uuid.UUID
+    transaction_id: Optional[uuid.UUID] = None
 
 
 # ============================================================================

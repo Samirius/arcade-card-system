@@ -8,6 +8,7 @@ from datetime import datetime
 
 from app.database import get_db
 from app.models import Card, CardType, CardStatus, Transaction, User
+from app.models.user import UserRole
 from app.schemas.business import (
     CardCreate, CardUpdate, CardResponse, CardBalanceResponse,
     CardListFilter, BalanceAddResponse, BalanceChargeResponse, BalanceOperation
@@ -24,11 +25,24 @@ def _check_card_tenant_access(db: Session, current_user: User, card: Card):
     """Verify that the current user can access this card (tenant isolation)."""
     if card is None:
         return
+    # Only OWNER can access across all tenants
+    if current_user.role == UserRole.OWNER:
+        return
     user_company = getattr(current_user, 'company_id', None)
-    if user_company is None:
-        return  # Super-admin
     card_company = getattr(card, 'company_id', None)
-    if card_company is not None and card_company != user_company:
+    # If card has no company, check if this user created it (via owner field matching email)
+    if card_company is None:
+        # Cards without company_id: only the creator (or OWNER) can access
+        # We check if the card owner matches the user's email or full name
+        user_name = f"{current_user.first_name} {current_user.last_name}"
+        if card.owner in (current_user.email, user_name):
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: you do not have access to this card"
+        )
+    # Card has company_id — user must match it
+    if user_company is None or user_company != card_company:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: card belongs to another company"

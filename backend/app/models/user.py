@@ -104,8 +104,16 @@ class User(Base):
 
     def is_locked(self):
         """Check if account is locked"""
-        if self.locked_until and self.locked_until > datetime.utcnow():
-            return True
+        if self.locked_until:
+            # Handle both timezone-aware and naive datetimes from PG
+            locked_until = self.locked_until
+            now = datetime.utcnow()
+            if locked_until.tzinfo is not None:
+                # PG returned tz-aware, make now tz-aware too
+                from datetime import timezone
+                now = datetime.now(timezone.utc)
+            if locked_until > now:
+                return True
         return self.status == UserStatus.LOCKED
 
     def has_role(self, *roles):
