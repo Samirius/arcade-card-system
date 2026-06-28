@@ -121,10 +121,6 @@ class AuthService:
             raise ValueError("Account is not active. Please contact administrator.")
 
         # Verify password
-        # DEBUG
-        print(f"[AUTH DEBUG] Email: {email}, Password length: {len(password)}, First char: {password[0] if password else 'NONE'}")
-        print(f"[AUTH DEBUG] Stored hash: {user.password_hash}")
-        print(f"[AUTH DEBUG] Verify result: {verify_password(password, user.password_hash)}")
         if not verify_password(password, user.password_hash):
             user.increment_failed_login()
             db.commit()
@@ -156,7 +152,7 @@ class AuthService:
         }, token_version=user.token_version)
         refresh_token = create_refresh_token({
             "sub": str(user.id)
-        })
+        }, token_version=user.token_version)
 
         # Log successful login with IP address
         log_audit(
@@ -273,13 +269,14 @@ class AuthService:
             Tuple of (user, new_access_token)
 
         Raises:
-            ValueError: If refresh token invalid
+            ValueError: If refresh token invalid or blacklisted
         """
-        from app.utils.jwt import decode_token
+        from app.utils.jwt import decode_token, verify_refresh_token
 
-        payload = decode_token(refresh_token_str)
+        # verify_refresh_token checks blacklist if db is provided
+        payload = verify_refresh_token(refresh_token_str, db=db)
         if not payload or payload.get("type") != "refresh":
-            raise ValueError("Invalid refresh token")
+            raise ValueError("Invalid or revoked refresh token")
 
         user_id = payload.get("sub")
         user = db.query(User).filter(User.id == user_id).first()
@@ -287,12 +284,18 @@ class AuthService:
         if not user or user.status != UserStatus.ACTIVE:
             raise ValueError("User not found or inactive")
 
-        # Generate new access token
+        # Check token_version: if the token was issued before a logout,
+        # the version won't match
+        token_version = payload.get("token_version")
+        if token_version is not None and token_version != user.token_version:
+            raise ValueError("Token has been revoked")
+
+        # Generate new access token with current token_version
         access_token = create_access_token({
             "sub": str(user.id),
             "email": user.email,
             "role": user.role
-        })
+        }, token_version=user.token_version)
 
         return user, access_token
 

@@ -15,8 +15,24 @@ from app.schemas.business import (
 from app.utils.audit import log_action
 from app.api.authorization import require_role
 from app.api.auth import get_current_user
+from app.utils.tenant import enforce_tenant_isolation
 
 router = APIRouter(prefix="/cards", tags=["cards"])
+
+
+def _check_card_tenant_access(db: Session, current_user: User, card: Card):
+    """Verify that the current user can access this card (tenant isolation)."""
+    if card is None:
+        return
+    user_company = getattr(current_user, 'company_id', None)
+    if user_company is None:
+        return  # Super-admin
+    card_company = getattr(card, 'company_id', None)
+    if card_company is not None and card_company != user_company:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: card belongs to another company"
+        )
 
 
 @router.post("/", response_model=CardResponse, status_code=status.HTTP_201_CREATED)
@@ -54,7 +70,8 @@ async def create_card(
         card_type=CardType[card_data.card_type],
         balance=card_data.initial_balance,
         status=CardStatus.ACTIVE,
-        notes=card_data.notes
+        notes=card_data.notes,
+        company_id=getattr(current_user, 'company_id', None)  # Auto-assign to user's company
     )
 
     db.add(new_card)
@@ -105,6 +122,9 @@ async def list_cards(
     """
     query = db.query(Card)
 
+    # Enforce tenant isolation (super-admins see all)
+    query = enforce_tenant_isolation(db, str(current_user.id), query, Card)
+
     # Apply filters
     if status:
         try:
@@ -143,18 +163,22 @@ async def get_cards_summary(
 
     **Permissions:** SUPERVISOR and above
     """
-    total_cards = db.query(Card).count()
-    active_cards = db.query(Card).filter(Card.status == CardStatus.ACTIVE).count()
+    # Base query with tenant isolation
+    base_query = db.query(Card)
+    base_query = enforce_tenant_isolation(db, str(current_user.id), base_query, Card)
+
+    total_cards = base_query.count()
+    active_cards = base_query.filter(Card.status == CardStatus.ACTIVE).count()
     inactive_cards = total_cards - active_cards
 
     # Count by card type
     card_type_counts = {}
     for card_type in CardType:
-        count = db.query(Card).filter(Card.card_type == card_type).count()
+        count = base_query.filter(Card.card_type == card_type).count()
         card_type_counts[card_type.value] = count
 
     # Total balance across all cards
-    total_balance = db.query(Card).with_entities(Card.balance).all()
+    total_balance = base_query.with_entities(Card.balance).all()
     total_balance_sum = sum([balance[0] for balance in total_balance]) if total_balance else Decimal(0.00)
 
     return {
@@ -245,6 +269,8 @@ async def get_card(
     if not card:
         raise HTTPException(status_code=404, detail="Card not found")
 
+    _check_card_tenant_access(db, current_user, card)
+
     return card
 
 
@@ -264,6 +290,8 @@ async def get_card_balance(
     card = db.query(Card).filter(Card.card_uid == card_uid).first()
     if not card:
         raise HTTPException(status_code=404, detail="Card not found")
+
+    _check_card_tenant_access(db, current_user, card)
 
     return {
         "card_uid": card.card_uid,
@@ -291,6 +319,8 @@ async def update_card(
     card = db.query(Card).filter(Card.card_uid == card_uid).first()
     if not card:
         raise HTTPException(status_code=404, detail="Card not found")
+
+    _check_card_tenant_access(db, current_user, card)
 
     # Update fields
     if card_data.owner is not None:
@@ -333,6 +363,8 @@ async def activate_card(
     if not card:
         raise HTTPException(status_code=404, detail="Card not found")
 
+    _check_card_tenant_access(db, current_user, card)
+
     if card.status == CardStatus.ACTIVE:
         raise HTTPException(status_code=400, detail="Card is already active")
 
@@ -368,6 +400,8 @@ async def deactivate_card(
     if not card:
         raise HTTPException(status_code=404, detail="Card not found")
 
+    _check_card_tenant_access(db, current_user, card)
+
     if card.status == CardStatus.INACTIVE:
         raise HTTPException(status_code=400, detail="Card is already inactive")
 
@@ -401,51 +435,32 @@ async def add_card_credit(
 
     Staff can add credit for cash payments.
     Supervisors+ can also refund or adjust.
+    Uses BalanceLedgerService for atomic operation + audit trail.
     """
-    card = db.query(Card).filter(Card.card_uid == card_uid).first()
-    if not card:
-        raise HTTPException(status_code=404, detail="Card not found")
+    from app.services.ledger import BalanceLedgerService
 
-    if not card.can_transact():
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot add credit to {card.status.value} card"
+    try:
+        result = BalanceLedgerService.add_balance(
+            db=db,
+            card_uid=card_uid,
+            amount=operation.amount,
+            user_id=str(current_user.id),
+            notes=operation.notes or f"Added {operation.amount} credits via {payment_method}",
+            metadata={"payment_method": payment_method, "endpoint": "add-credit"}
         )
 
-    old_balance = card.balance
-    card.add_balance(operation.amount)
-    card.last_transaction_at = datetime.utcnow()
-
-    # Create transaction
-    transaction = Transaction(
-        card_uid=card_uid,
-        amount=operation.amount,
-        transaction_type="ADD",
-        payment_method=payment_method,
-        user_id=current_user.id,
-        notes=operation.notes or f"Added {operation.amount} credits"
-    )
-    db.add(transaction)
-
-    db.commit()
-    db.refresh(card)
-
-    # Log action
-    log_action(
-        db=db,
-        user_id=current_user.id,
-        action="CARD_ADD_CREDIT",
-        details=f"Added {operation.amount} to card {card_uid} (new balance: {card.balance})"
-    )
-
-    return {
-        "success": True,
-        "message": f"Successfully added {operation.amount} credits to card",
-        "card_uid": card_uid,
-        "old_balance": old_balance,
-        "new_balance": card.balance,
-        "transaction_id": transaction.id
-    }
+        return {
+            "success": True,
+            "message": f"Successfully added {operation.amount} credits to card",
+            "card_uid": card_uid,
+            "old_balance": result["balance_before"],
+            "new_balance": result["balance_after"],
+            "transaction_id": None
+        }
+    except ValueError as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail="Card not found")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/{card_uid}/charge", response_model=BalanceChargeResponse)
@@ -461,62 +476,35 @@ async def charge_card(
     **Permissions:** STAFF and above
 
     Used when a customer plays a game or uses a service.
+    Uses BalanceLedgerService for atomic operation + audit trail.
     """
-    # Use row locking to prevent race conditions
-    card = db.query(Card).filter(
-        Card.card_uid == card_uid
-    ).with_for_update().first()
+    from app.services.ledger import BalanceLedgerService
 
-    if not card:
-        raise HTTPException(status_code=404, detail="Card not found")
-
-    if not card.can_transact():
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot charge {card.status.value} card"
+    try:
+        result = BalanceLedgerService.deduct_balance(
+            db=db,
+            card_uid=card_uid,
+            amount=operation.amount,
+            user_id=str(current_user.id),
+            notes=operation.notes or f"Charged {operation.amount} credits",
+            metadata={"endpoint": "charge"}
         )
 
-    if card.balance < operation.amount:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Insufficient balance. Card has {card.balance}, attempting to charge {operation.amount}"
-        )
-
-    old_balance = card.balance
-    card.deduct_balance(operation.amount)
-    card.last_transaction_at = datetime.utcnow()
-
-    # Create transaction
-    transaction = Transaction(
-        card_uid=card_uid,
-        amount=operation.amount,
-        transaction_type="DEDUCT",
-        payment_method=None,
-        user_id=current_user.id,
-        notes=operation.notes or f"Charged {operation.amount} credits"
-    )
-    db.add(transaction)
-
-    db.commit()
-    db.refresh(card)
-
-    # Log action
-    log_action(
-        db=db,
-        user_id=current_user.id,
-        action="CARD_CHARGE",
-        details=f"Charged {operation.amount} from card {card_uid} (new balance: {card.balance})"
-    )
-
-    return {
-        "success": True,
-        "message": f"Successfully charged {operation.amount} credits from card",
-        "card_uid": card_uid,
-        "old_balance": old_balance,
-        "new_balance": card.balance,
-        "amount_charged": operation.amount,
-        "transaction_id": transaction.id
-    }
+        return {
+            "success": True,
+            "message": f"Successfully charged {operation.amount} credits from card",
+            "card_uid": card_uid,
+            "old_balance": result["balance_before"],
+            "new_balance": result["balance_after"],
+            "amount_charged": operation.amount,
+            "transaction_id": None
+        }
+    except ValueError as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail="Card not found")
+        if "insufficient" in str(e).lower():
+            raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/{card_uid}/transactions", response_model=List[dict])
@@ -535,6 +523,8 @@ async def get_card_transactions(
     card = db.query(Card).filter(Card.card_uid == card_uid).first()
     if not card:
         raise HTTPException(status_code=404, detail="Card not found")
+
+    _check_card_tenant_access(db, current_user, card)
 
     transactions = db.query(Transaction).filter(
         Transaction.card_uid == card_uid

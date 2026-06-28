@@ -57,6 +57,21 @@ class UserCreateRequest(BaseModel):
             raise ValueError('Password must be 12+ characters with uppercase, lowercase, numbers, and special characters')
         return v
 
+    @field_validator('role')
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        """Only allow safe roles for self-registration"""
+        if v is None:
+            return UserRole.STAFF
+        allowed = {UserRole.STAFF, UserRole.SUPERVISOR}
+        try:
+            role_val = UserRole(v)
+        except ValueError:
+            raise ValueError(f'Invalid role: {v}')
+        if role_val not in allowed:
+            raise ValueError(f'Cannot self-register as {v}. Privileged roles require admin assignment.')
+        return role_val
+
 
 class MFAVerifyRequest(BaseModel):
     """MFA verification request"""
@@ -147,7 +162,7 @@ async def register_user(
             first_name=user_data.first_name,
             last_name=user_data.last_name,
             phone=user_data.phone,
-            role=user_data.role or UserRole.STAFF
+            role=user_data.role if isinstance(user_data.role, UserRole) else UserRole(user_data.role or "STAFF")
         )
 
         # Send verification email
@@ -355,6 +370,7 @@ async def verify_mfa_setup(
 
 @router.post("/logout")
 async def logout(
+    request: Request,
     logout_data: dict = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

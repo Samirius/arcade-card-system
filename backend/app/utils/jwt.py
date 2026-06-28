@@ -43,17 +43,23 @@ def create_access_token(data: Dict[str, Any], token_version: Optional[int] = Non
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def create_refresh_token(data: Dict[str, Any]) -> str:
+def create_refresh_token(data: Dict[str, Any], token_version: Optional[int] = None) -> str:
     """
     Create a JWT refresh token.
 
     Args:
         data: Data to encode in the token
+        token_version: User's token version for revocation checking
 
     Returns:
         Encoded JWT refresh token
     """
     to_encode = data.copy()
+
+    # Add token_version if provided
+    if token_version is not None:
+        to_encode["token_version"] = token_version
+
     expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
     to_encode.update({

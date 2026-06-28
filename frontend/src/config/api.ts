@@ -7,6 +7,10 @@ export const api = axios.create({
 })
 
 // --- Request interceptor: attach access token ---
+// ⚠️ SECURITY NOTE: Token stored in localStorage is vulnerable to XSS.
+// For production hardening, migrate to in-memory token storage with
+// httpOnly cookie for refresh token (backend already supports withCredentials).
+// See audit item H5 for details.
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('sindbad-access-token')
   if (token) {

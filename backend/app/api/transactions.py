@@ -11,6 +11,7 @@ from app.models import Transaction, Card, User
 from app.schemas.business import TransactionCreate, TransactionResponse, TransactionListFilter
 from app.utils.audit import log_action
 from app.api.authorization import require_role
+from app.utils.tenant import enforce_tenant_isolation
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -101,6 +102,16 @@ async def list_transactions(
     Can filter by card UID, transaction type, and date range.
     """
     query = db.query(Transaction)
+
+    # Enforce tenant isolation via card company_id
+    from app.models.card import Card
+    user_company = getattr(current_user, 'company_id', None)
+    if user_company is not None:
+        # Filter transactions to only those for cards in the user's company
+        company_card_uids = db.query(Card.card_uid).filter(
+            Card.company_id == user_company
+        ).subquery()
+        query = query.filter(Transaction.card_uid.in_(company_card_uids))
 
     # Apply filters
     if card_uid:

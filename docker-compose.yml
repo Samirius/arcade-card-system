@@ -30,12 +30,12 @@ services:
     container_name: arcade-backend
     environment:
       - DATABASE_URL=postgresql://arcade_user:arcade_secure_password_2024@postgres:5432/arcade_management
-      - SECRET_KEY=your-secret-key-change-in-production
-      - ACCESS_TOKEN_EXPIRE_MINUTES=30
-      - REFRESH_TOKEN_EXPIRE_DAYS=7
-      - DEBUG=true
-      - ENVIRONMENT=development
-      - CORS_ORIGINS=http://localhost:8080,http://localhost:3000
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set in .env}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      - DEBUG=${DEBUG:-false}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - CORS_ORIGINS=${CORS_ORIGINS:?CORS_ORIGINS must be set in .env}
     ports:
       - "8000:8000"
     depends_on:

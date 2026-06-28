@@ -1,5 +1,5 @@
 """FastAPI application with security"""
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
@@ -15,6 +15,8 @@ from app.api.companies import router as companies_router
 from app.api.balance import router as balance_router
 from app.api.offline import router as offline_router
 from app.database import engine, Base
+from app.logging import setup_logging
+from app.exceptions import http_exception_handler, validation_exception_handler, general_exception_handler
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -24,6 +26,7 @@ from slowapi.errors import RateLimitExceeded
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
+    setup_logging()
     print("🚀 Starting Arcade Management System...")
     print(f"📊 Environment: {settings.environment}")
     print(f"🔒 Debug mode: {settings.debug}")
@@ -58,6 +61,11 @@ app.state.limiter = limiter
 
 # Add rate limiting
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Register exception handlers
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
 
 # Configure CORS
 configure_cors(app)
@@ -110,8 +118,17 @@ async def health_check():
 
 
 @app.get("/security-info")
-async def security_info():
-    """Security information endpoint (for debugging)"""
+async def security_info(
+    debug: bool = settings.debug,
+):
+    """
+    Security information endpoint.
+
+    Only available in debug mode. In production, returns 404.
+    """
+    if not debug:
+        raise HTTPException(status_code=404, detail="Not Found")
+
     return {
         "security_features": {
             "password_hashing": "bcrypt (12 rounds, 72-byte limit)",

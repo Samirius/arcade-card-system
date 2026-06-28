@@ -70,7 +70,7 @@ class BalanceLedgerService:
             user_id=user_id,
             notes=notes,
             reason_code=reason_code,
-            metadata=metadata,
+            extra_metadata=metadata,  # Model column is extra_metadata, not metadata
             created_at=datetime.utcnow()
         )
 
