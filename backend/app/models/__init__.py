@@ -7,6 +7,8 @@ from app.models.customer import Customer
 from app.models.location import Location, LocationStatus
 from app.models.machine import Machine, MachineType, MachineStatus
 from app.models.company import Company
+from app.models.balance import BalanceLedger, BalanceSnapshot
+from app.models.offline import OfflineToken, OfflineTransaction
 
 __all__ = [
     "User",
@@ -26,4 +28,8 @@ __all__ = [
     "MachineType",
     "MachineStatus",
     "Company",
+    "BalanceLedger",
+    "BalanceSnapshot",
+    "OfflineToken",
+    "OfflineTransaction",
 ]

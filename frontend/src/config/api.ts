@@ -91,7 +91,8 @@ api.interceptors.response.use(
     isRefreshing = true
 
     try {
-      const res = await api.post('/api/v1/auth/refresh', {})
+      const refreshToken = localStorage.getItem('sindbad-refresh-token')
+      const res = await api.post('/api/v1/auth/refresh', { refresh_token: refreshToken })
       const newToken = res.data.access_token
       localStorage.setItem('sindbad-access-token', newToken)
 
