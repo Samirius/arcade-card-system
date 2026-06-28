@@ -62,8 +62,13 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
-    // If not 401 or already retried, reject
-    if (error.response?.status !== 401 || originalRequest._retry) {
+    // If not 401, already retried, or is a login/refresh request — reject immediately
+    if (
+      error.response?.status !== 401 ||
+      originalRequest._retry ||
+      originalRequest.url?.includes('/auth/login') ||
+      originalRequest.url?.includes('/auth/refresh')
+    ) {
       return Promise.reject(error)
     }
 
@@ -91,8 +96,10 @@ api.interceptors.response.use(
       return api(originalRequest)
     } catch (refreshErr) {
       processQueue(refreshErr, null)
-      // Redirect to login
-      window.location.href = '/login'
+      // Clear token silently — don't force redirect (let router guard handle it)
+      localStorage.removeItem('sindbad-access-token')
+      localStorage.removeItem('sindbad-refresh-token')
+      delete originalRequest.headers.Authorization
       return Promise.reject(refreshErr)
     } finally {
       isRefreshing = false

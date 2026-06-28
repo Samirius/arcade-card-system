@@ -130,8 +130,8 @@ class AuthService:
             db.commit()
             raise ValueError("Invalid email or password")
 
-        # Check if MFA is required for privileged roles
-        if user.is_privileged() and not user.mfa_enabled:
+        # Check if MFA is required for privileged roles (skip in DEBUG mode)
+        if user.is_privileged() and not user.mfa_enabled and not settings.debug:
             raise ValueError("MFA is required for privileged accounts. Please enable MFA first.")
 
         # Check if MFA is required

@@ -54,15 +54,23 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function init() {
-    // Check for existing session via refresh token cookie
+    // Only try to restore session if we already have a token
+    const existingToken = localStorage.getItem('sindbad-access-token')
+    if (!existingToken) return
+    
     try {
-      const res = await api.post('/api/v1/auth/refresh', {})
-      if (res.data.access_token) {
-        setToken(res.data.access_token)
-        await fetchUser()
-      }
+      await fetchUser()
     } catch {
-      clearToken()
+      // Token expired, try refresh once
+      try {
+        const res = await api.post('/api/v1/auth/refresh', {})
+        if (res.data.access_token) {
+          setToken(res.data.access_token)
+          user.value = normalizeUser(res.data.user)
+        }
+      } catch {
+        clearToken()
+      }
     }
   }
 
