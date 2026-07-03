@@ -43,7 +43,7 @@ from app.schemas.device import (
     OfflineEnvelopeResponse,
     OfflinePubkeyResponse,
 )
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, set_tenant_context, begin_credential_lookup
 from app.api.authorization import require_role
 from app.services.money import MoneyService
 from app.utils import signing
@@ -84,6 +84,12 @@ async def get_current_device(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # A device is authenticated by its global token hash, which exists BEFORE
+    # any tenant context. `devices` is under RLS, so open a narrow bypass window
+    # for just this credential lookup; the real (device-scoped) tenant context
+    # is pinned immediately after via set_tenant_context below.
+    begin_credential_lookup(db)
+
     token_hash = _hash_token(credentials.credentials)
     device = db.query(Device).filter(Device.device_token_hash == token_hash).first()
 
@@ -100,12 +106,40 @@ async def get_current_device(
             detail="Device is not active",
         )
 
+    # Capture the device's tenant key WHILE it is still loaded under the
+    # credential-lookup bypass window opened above, and BEFORE the liveness
+    # commit below expires it. If we read this attribute after the commit it
+    # would trigger a lazy reload in a transaction that has no tenant context
+    # yet (the bypass is transaction-scoped and cleared by the commit), and RLS
+    # would then hide the device's own row.
+    device_company_id = device.company_id
+
     # Best-effort liveness tracking (does not block the request on failure).
     try:
         device.last_seen_at = datetime.utcnow()
         db.commit()
     except Exception:
         db.rollback()
+
+    # Bind the per-request RLS tenant context AFTER the liveness commit above:
+    # set_config(..., is_local=true) is transaction-scoped, and the commit ends
+    # that transaction. set_tenant_context also stashes the context on the
+    # session so the after_begin listener re-applies it to every subsequent
+    # transaction in this request — so all money queries are scoped to the
+    # device's company. Devices are never super-admin.
+    set_tenant_context(
+        db,
+        company_id=device_company_id,
+        is_superadmin=False,
+    )
+
+    # The liveness commit expired ``device``'s attributes. Eagerly reload it now,
+    # WITHIN the tenant-scoped transaction just opened by set_tenant_context, so
+    # the /charge & /reconcile endpoints can read ``device.id`` /
+    # ``device.company_id`` without a lazy reload landing in an unscoped
+    # transaction. The device belongs to ``device_company_id`` — exactly the
+    # tenant now in force — so it is visible.
+    db.refresh(device)
 
     return device
 
