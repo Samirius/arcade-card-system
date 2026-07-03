@@ -4,6 +4,9 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/config/api'
 
+// FIELD NORMALIZATION REMOVED (see frontend/FRONTEND_CHANGES.md item 2):
+// reads `txn.transaction_type` directly instead of the previously
+// auto-mapped `txn.type`.
 const { t } = useI18n()
 const router = useRouter()
 
@@ -78,10 +81,10 @@ onMounted(loadRecent)
         <div v-for="txn in recentTxns" :key="txn.id" class="txn-item">
           <div class="txn-info">
             <span class="txn-uid text-mono">{{ txn.card_uid?.substring(0, 12) }}</span>
-            <span class="txn-type">{{ t(`transaction.types.${txn.type?.toLowerCase() || 'add'}`) }}</span>
+            <span class="txn-type">{{ t(`transaction.types.${txn.transaction_type?.toLowerCase() || 'add'}`) }}</span>
           </div>
-          <span :class="['txn-amount', txn.type === 'DEDUCT' ? 'deduct' : 'add']">
-            {{ txn.type === 'DEDUCT' ? '-' : '+' }}{{ formatAmount(txn.amount) }}
+          <span :class="['txn-amount', txn.transaction_type === 'DEDUCT' ? 'deduct' : 'add']">
+            {{ txn.transaction_type === 'DEDUCT' ? '-' : '+' }}{{ formatAmount(txn.amount) }}
           </span>
         </div>
       </div>

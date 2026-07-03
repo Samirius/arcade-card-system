@@ -8,6 +8,9 @@ import PageHeader from '@/components/layout/PageHeader.vue'
 const { t } = useI18n()
 const router = useRouter()
 
+// FIELD NORMALIZATION REMOVED (see frontend/FRONTEND_CHANGES.md item 2):
+// reads raw backend field names (`card_uid`, `owner`, `card_type`) instead
+// of the previously auto-mapped `uid`/`customer_name`/`type`.
 const loading = ref(true)
 const cards = ref<any[]>([])
 const searchQuery = ref('')
@@ -19,8 +22,8 @@ const filteredCards = computed(() => {
     const q = searchQuery.value.toLowerCase()
     result = result.filter(
       (c) =>
-        c.uid?.toLowerCase().includes(q) ||
-        c.customer_name?.toLowerCase().includes(q)
+        c.card_uid?.toLowerCase().includes(q) ||
+        c.owner?.toLowerCase().includes(q)
     )
   }
   if (statusFilter.value) {
@@ -115,19 +118,19 @@ onMounted(loadCards)
         :rows="20"
         :rows-per-page-options="[10, 20, 50]"
         :empty-message="t('card.noCards')"
-        @row-click="(e: any) => router.push(`/admin/cards/${e.data.uid}`)"
+        @row-click="(e: any) => router.push(`/admin/cards/${e.data.card_uid}`)"
         row-hover
       >
-        <Column field="uid" :header="t('card.uid')" class="uid-col" />
-        <Column field="customer_name" :header="t('card.customer')">
+        <Column field="card_uid" :header="t('card.uid')" class="uid-col" />
+        <Column field="owner" :header="t('card.customer')">
           <template #body="{ data }">
-            {{ data.customer_name || '—' }}
+            {{ data.owner || '—' }}
           </template>
         </Column>
-        <Column field="type" :header="t('card.type')">
+        <Column field="card_type" :header="t('card.type')">
           <template #body="{ data }">
-            <Tag :severity="typeSeverity[data.type] || 'info'">
-              {{ t(`card.types.${data.type?.toLowerCase() || 'regular'}`) }}
+            <Tag :severity="typeSeverity[data.card_type] || 'info'">
+              {{ t(`card.types.${data.card_type?.toLowerCase() || 'regular'}`) }}
             </Tag>
           </template>
         </Column>

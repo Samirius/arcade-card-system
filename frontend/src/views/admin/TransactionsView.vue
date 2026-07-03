@@ -8,6 +8,9 @@ import PageHeader from '@/components/layout/PageHeader.vue'
 const { t } = useI18n()
 const router = useRouter()
 
+// FIELD NORMALIZATION REMOVED (see frontend/FRONTEND_CHANGES.md item 2):
+// reads `transaction_type` directly instead of the previously auto-mapped
+// `type`.
 const loading = ref(true)
 const transactions = ref<any[]>([])
 
@@ -62,17 +65,17 @@ onMounted(loadTransactions)
           </template>
         </Column>
         <Column field="card_uid" :header="t('card.uid')" class="uid-col" />
-        <Column field="type" :header="t('transaction.type')">
+        <Column field="transaction_type" :header="t('transaction.type')">
           <template #body="{ data }">
-            <Tag :severity="typeSeverity[data.type] || 'info'">
-              {{ t(`transaction.types.${data.type?.toLowerCase() || 'add'}`) }}
+            <Tag :severity="typeSeverity[data.transaction_type] || 'info'">
+              {{ t(`transaction.types.${data.transaction_type?.toLowerCase() || 'add'}`) }}
             </Tag>
           </template>
         </Column>
         <Column field="amount" :header="t('transaction.amount')">
           <template #body="{ data }">
-            <span :class="['amount', data.type === 'DEDUCT' ? 'deduct' : 'add']">
-              {{ data.type === 'DEDUCT' ? '-' : '+' }}{{ formatAmount(data.amount) }} ج.م
+            <span :class="['amount', data.transaction_type === 'DEDUCT' ? 'deduct' : 'add']">
+              {{ data.transaction_type === 'DEDUCT' ? '-' : '+' }}{{ formatAmount(data.amount) }} ج.م
             </span>
           </template>
         </Column>

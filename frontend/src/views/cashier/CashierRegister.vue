@@ -9,6 +9,27 @@ const { t } = useI18n()
 const router = useRouter()
 const toast = useToast()
 
+// FIELD NORMALIZATION REMOVED (see frontend/FRONTEND_CHANGES.md item 2):
+// this request body previously sent `uid`/`customer_name`, which do NOT
+// match backend/app/schemas/business.py's `CardCreate` schema (it requires
+// `card_uid` and `owner`). That was a PRE-EXISTING bug independent of this
+// refactor — the old response-normalization layer only ever ran on
+// responses, never on outgoing request bodies, so card registration was
+// likely already failing (422 from FastAPI/Pydantic for a missing required
+// `owner` field) before this patch. Fixed here to send the real field names.
+// `form.uid`/`form.customer_name` are kept as the local field/variable names
+// (they read fine as UI labels) and mapped to `card_uid`/`owner` at the
+// request boundary.
+//
+// ⚠️ UNRESOLVED GAP (flagging, not guessing a fix): `owner` is a REQUIRED,
+// non-empty field on the backend (`Field(..., min_length=1, ...)`), but this
+// form's "customer name" input has no required-field validation and can be
+// submitted blank, in which case we send `owner: undefined` and the backend
+// will very likely reject the request with a 422. This needs a product
+// decision during the verified build — either (a) make customer name
+// required in this form, or (b) ask the backend team to make `owner`
+// optional / accept a default. Not resolved here because guessing the wrong
+// one would be worse than leaving it visible.
 const form = reactive({
   uid: '',
   card_type: 'REGULAR',
@@ -21,12 +42,12 @@ async function handleRegister() {
   saving.value = true
   try {
     const res = await api.post('/api/v1/cards/', {
-      uid: form.uid,
+      card_uid: form.uid,
       card_type: form.card_type,
-      customer_name: form.customer_name || undefined,
+      owner: form.customer_name || undefined,
     })
     toast.add({ severity: 'success', summary: t('common.success'), life: 3000 })
-    router.push(`/cashier/balance/${res.data.uid}`)
+    router.push(`/cashier/balance/${res.data.card_uid}`)
   } catch (err: any) {
     toast.add({ severity: 'error', summary: err.response?.data?.detail || t('common.error'), life: 4000 })
   } finally {

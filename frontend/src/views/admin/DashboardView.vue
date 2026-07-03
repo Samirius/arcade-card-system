@@ -7,6 +7,10 @@ import PageHeader from '@/components/layout/PageHeader.vue'
 
 const { t } = useI18n()
 
+// FIELD NORMALIZATION REMOVED (see frontend/FRONTEND_CHANGES.md item 2):
+// the recent-transactions table below now reads `transaction_type` directly
+// instead of the previously auto-mapped `type`. `stats` fields were never
+// touched by the old normalization layer and are unaffected.
 const loading = ref(true)
 const stats = ref({
   revenue_today: 0,
@@ -99,17 +103,17 @@ onMounted(loadData)
             {{ data.card_uid || '—' }}
           </template>
         </Column>
-        <Column field="type" :header="t('transaction.type')">
+        <Column field="transaction_type" :header="t('transaction.type')">
           <template #body="{ data }">
-            <Tag :severity="data.type === 'ADD' ? 'success' : data.type === 'DEDUCT' ? 'warning' : 'info'">
-              {{ t(`transaction.types.${data.type?.toLowerCase() || 'add'}`) }}
+            <Tag :severity="data.transaction_type === 'ADD' ? 'success' : data.transaction_type === 'DEDUCT' ? 'warning' : 'info'">
+              {{ t(`transaction.types.${data.transaction_type?.toLowerCase() || 'add'}`) }}
             </Tag>
           </template>
         </Column>
         <Column field="amount" :header="t('transaction.amount')">
           <template #body="{ data }">
-            <span :class="['amount', data.type === 'DEDUCT' ? 'deduct' : 'add']">
-              {{ data.type === 'DEDUCT' ? '-' : '+' }}{{ formatAmount(data.amount) }} ج.م
+            <span :class="['amount', data.transaction_type === 'DEDUCT' ? 'deduct' : 'add']">
+              {{ data.transaction_type === 'DEDUCT' ? '-' : '+' }}{{ formatAmount(data.amount) }} ج.م
             </span>
           </template>
         </Column>

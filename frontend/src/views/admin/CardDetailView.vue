@@ -11,6 +11,11 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 
+// FIELD NORMALIZATION REMOVED (see frontend/FRONTEND_CHANGES.md item 2):
+// this view now reads raw backend field names directly — `card.card_uid`,
+// `card.owner`, `card.card_type`, and `transaction.transaction_type` —
+// instead of the previously auto-mapped `uid`/`customer_name`/`type` the
+// old response interceptor used to synthesize.
 const uid = route.params.uid as string
 const loading = ref(true)
 const card = ref<any>(null)
@@ -110,16 +115,16 @@ onMounted(loadCard)
       <!-- Card Info Card -->
       <div class="card-info-panel">
         <div class="card-info-left">
-          <div class="card-uid">{{ card.uid }}</div>
+          <div class="card-uid">{{ card.card_uid }}</div>
           <div class="card-meta">
-            <Tag severity="warning" v-if="card.type === 'VIP'">{{ t('card.types.vip') }}</Tag>
-            <Tag severity="info" v-else>{{ t(`card.types.${card.type?.toLowerCase()}`) }}</Tag>
+            <Tag severity="warning" v-if="card.card_type === 'VIP'">{{ t('card.types.vip') }}</Tag>
+            <Tag severity="info" v-else>{{ t(`card.types.${card.card_type?.toLowerCase()}`) }}</Tag>
             <Tag :severity="card.status === 'ACTIVE' ? 'success' : 'danger'">
               {{ t(`card.statuses.${card.status?.toLowerCase()}`) }}
             </Tag>
           </div>
-          <div v-if="card.customer_name" class="card-customer">
-            {{ card.customer_name }}
+          <div v-if="card.owner" class="card-customer">
+            {{ card.owner }}
           </div>
         </div>
         <div class="card-info-right">
@@ -167,17 +172,17 @@ onMounted(loadCard)
                   {{ new Date(data.created_at).toLocaleString('ar-EG') }}
                 </template>
               </Column>
-              <Column field="type" :header="t('transaction.type')">
+              <Column field="transaction_type" :header="t('transaction.type')">
                 <template #body="{ data }">
-                  <Tag :severity="data.type === 'ADD' ? 'success' : 'warning'">
-                    {{ t(`transaction.types.${data.type?.toLowerCase()}`) }}
+                  <Tag :severity="data.transaction_type === 'ADD' ? 'success' : 'warning'">
+                    {{ t(`transaction.types.${data.transaction_type?.toLowerCase()}`) }}
                   </Tag>
                 </template>
               </Column>
               <Column field="amount" :header="t('transaction.amount')">
                 <template #body="{ data }">
-                  <span :class="['amount', data.type === 'DEDUCT' ? 'deduct' : 'add']">
-                    {{ data.type === 'DEDUCT' ? '-' : '+' }}{{ formatAmount(data.amount) }}
+                  <span :class="['amount', data.transaction_type === 'DEDUCT' ? 'deduct' : 'add']">
+                    {{ data.transaction_type === 'DEDUCT' ? '-' : '+' }}{{ formatAmount(data.amount) }}
                   </span>
                 </template>
               </Column>

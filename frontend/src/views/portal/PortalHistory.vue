@@ -3,6 +3,9 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/config/api'
 
+// FIELD NORMALIZATION REMOVED (see frontend/FRONTEND_CHANGES.md item 2):
+// reads `txn.transaction_type` directly instead of the previously
+// auto-mapped `txn.type`.
 const { t } = useI18n()
 const loading = ref(true)
 const transactions = ref<any[]>([])
@@ -31,12 +34,12 @@ onMounted(loadHistory)
 
     <div v-else class="timeline">
       <div v-for="txn in transactions" :key="txn.id" class="timeline-item">
-        <div class="timeline-dot" :class="txn.type === 'DEDUCT' ? 'deduct-dot' : 'add-dot'" />
+        <div class="timeline-dot" :class="txn.transaction_type === 'DEDUCT' ? 'deduct-dot' : 'add-dot'" />
         <div class="timeline-content">
           <div class="timeline-header">
-            <span class="txn-type">{{ t(`transaction.types.${txn.type?.toLowerCase() || 'add'}`) }}</span>
-            <span :class="['txn-amount', txn.type === 'DEDUCT' ? 'deduct' : 'add']">
-              {{ txn.type === 'DEDUCT' ? '-' : '+' }}{{ formatAmount(txn.amount) }} ج.م
+            <span class="txn-type">{{ t(`transaction.types.${txn.transaction_type?.toLowerCase() || 'add'}`) }}</span>
+            <span :class="['txn-amount', txn.transaction_type === 'DEDUCT' ? 'deduct' : 'add']">
+              {{ txn.transaction_type === 'DEDUCT' ? '-' : '+' }}{{ formatAmount(txn.amount) }} ج.م
             </span>
           </div>
           <span class="txn-date">{{ new Date(txn.created_at).toLocaleString('ar-EG') }}</span>

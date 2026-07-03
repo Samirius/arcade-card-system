@@ -3,6 +3,9 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/config/api'
 
+// FIELD NORMALIZATION REMOVED (see frontend/FRONTEND_CHANGES.md item 2):
+// reads `card.card_uid` / `card.card_type` directly instead of the
+// previously auto-mapped `uid` / `type`.
 const { t } = useI18n()
 const loading = ref(true)
 const card = ref<any>(null)
@@ -32,8 +35,8 @@ onMounted(loadBalance)
       <div class="balance-currency">ج.م</div>
 
       <div class="card-info">
-        <span class="card-uid text-mono">{{ card.uid }}</span>
-        <Tag severity="warning" v-if="card.type === 'VIP'">VIP</Tag>
+        <span class="card-uid text-mono">{{ card.card_uid }}</span>
+        <Tag severity="warning" v-if="card.card_type === 'VIP'">VIP</Tag>
       </div>
 
       <Button

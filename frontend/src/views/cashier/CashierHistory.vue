@@ -3,6 +3,9 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/config/api'
 
+// FIELD NORMALIZATION REMOVED (see frontend/FRONTEND_CHANGES.md item 2):
+// reads `txn.transaction_type` directly instead of the previously
+// auto-mapped `txn.type`.
 const { t } = useI18n()
 const loading = ref(true)
 const transactions = ref<any[]>([])
@@ -36,11 +39,11 @@ onMounted(loadHistory)
           <span class="txn-uid text-mono">{{ txn.card_uid?.substring(0, 12) }}</span>
           <span class="txn-time">{{ new Date(txn.created_at).toLocaleTimeString('ar-EG') }}</span>
         </div>
-        <Tag :severity="txn.type === 'ADD' ? 'success' : 'warning'">
-          {{ t(`transaction.types.${txn.type?.toLowerCase() || 'add'}`) }}
+        <Tag :severity="txn.transaction_type === 'ADD' ? 'success' : 'warning'">
+          {{ t(`transaction.types.${txn.transaction_type?.toLowerCase() || 'add'}`) }}
         </Tag>
-        <span :class="['txn-amount', txn.type === 'DEDUCT' ? 'deduct' : 'add']">
-          {{ txn.type === 'DEDUCT' ? '-' : '+' }}{{ formatAmount(txn.amount) }}
+        <span :class="['txn-amount', txn.transaction_type === 'DEDUCT' ? 'deduct' : 'add']">
+          {{ txn.transaction_type === 'DEDUCT' ? '-' : '+' }}{{ formatAmount(txn.amount) }}
         </span>
       </div>
     </div>

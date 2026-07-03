@@ -10,6 +10,10 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 
+// FIELD NORMALIZATION REMOVED (see frontend/FRONTEND_CHANGES.md item 2):
+// reads raw backend field names (`card.card_uid`, `card.owner`,
+// `card.card_type`) instead of the previously auto-mapped
+// `uid`/`customer_name`/`type`.
 const uid = route.params.uid as string
 const loading = ref(true)
 const card = ref<any>(null)
@@ -70,8 +74,8 @@ onMounted(loadCard)
     <template v-else-if="card">
       <!-- Balance Display -->
       <div class="balance-card">
-        <div class="card-uid text-mono">{{ card.uid }}</div>
-        <div v-if="card.customer_name" class="customer-name">{{ card.customer_name }}</div>
+        <div class="card-uid text-mono">{{ card.card_uid }}</div>
+        <div v-if="card.owner" class="customer-name">{{ card.owner }}</div>
 
         <div class="balance-display">
           <div class="balance-label">{{ t('cashier.currentBalance') }}</div>
@@ -80,7 +84,7 @@ onMounted(loadCard)
         </div>
 
         <div class="card-meta">
-          <Tag severity="warning" v-if="card.type === 'VIP'">VIP</Tag>
+          <Tag severity="warning" v-if="card.card_type === 'VIP'">VIP</Tag>
           <Tag :severity="card.status === 'ACTIVE' ? 'success' : 'danger'">
             {{ t(`card.statuses.${card.status?.toLowerCase()}`) }}
           </Tag>

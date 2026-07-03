@@ -9,6 +9,9 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
+// FIELD NORMALIZATION REMOVED (see frontend/FRONTEND_CHANGES.md item 2):
+// reads `transaction.transaction_type` directly instead of the previously
+// auto-mapped `transaction.type`. `card_uid` was already the raw field name.
 const loading = ref(true)
 const transaction = ref<any>(null)
 
@@ -50,7 +53,7 @@ onMounted(loadTransaction)
       </div>
       <div class="detail-row">
         <span class="label">{{ t('transaction.type') }}:</span>
-        <Tag severity="info">{{ t(`transaction.types.${transaction.type?.toLowerCase()}`) }}</Tag>
+        <Tag severity="info">{{ t(`transaction.types.${transaction.transaction_type?.toLowerCase()}`) }}</Tag>
       </div>
       <div class="detail-row">
         <span class="label">{{ t('transaction.amount') }}:</span>

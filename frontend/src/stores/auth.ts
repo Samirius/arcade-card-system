@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '@/config/api'
+import { setAccessToken, clearAccessToken } from '@/lib/tokenStore'
 
 export interface User {
   id: string
@@ -12,6 +13,23 @@ export interface User {
   mfa_enabled: boolean
 }
 
+/**
+ * NOTE ON NORMALIZATION: this is intentionally NOT the same thing as the
+ * `normalizeCardFields` shim that was removed from `src/config/api.ts`.
+ * That shim silently renamed backend fields (`card_uid` -> `uid`, `owner` ->
+ * `customer_name`, ...) to paper over a frontend/backend contract mismatch,
+ * which is exactly what the OpenAPI-generated typed client
+ * (`src/lib/api-types.ts`, `npm run gen:api`) is meant to make impossible to
+ * miss going forward.
+ *
+ * `normalizeUser` below is different: the backend genuinely returns
+ * `first_name` + `last_name` as two separate fields (see
+ * backend/app/api/auth.py `/login`, `/login/mfa`, `/me`), and there is no
+ * single `full_name` field to rename from — this is a real UI-convenience
+ * derivation, not a rename. It is kept as-is. If/when the backend adds a
+ * computed `full_name` to its response, this can be simplified to read it
+ * directly.
+ */
 function normalizeUser(raw: any): User {
   return {
     id: raw.id,
@@ -26,6 +44,11 @@ function normalizeUser(raw: any): User {
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
+  // `accessToken` stays as a ref purely so components/router-guards can
+  // reactively read `isAuthenticated` etc. The actual token VALUE used for
+  // outgoing requests lives only in `@/lib/tokenStore` (in-memory, not
+  // localStorage) — this ref mirrors that value for reactivity but is not
+  // itself the source of truth read by the axios interceptor.
   const accessToken = ref<string | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -45,32 +68,46 @@ export const useAuthStore = defineStore('auth', () => {
 
   function setToken(token: string) {
     accessToken.value = token
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    setAccessToken(token)
+    // No `api.defaults.headers.common['Authorization']` assignment anymore —
+    // the request interceptor in `@/config/api.ts` reads the token fresh
+    // from the in-memory store on every request, so there is nothing to
+    // keep in sync here.
   }
 
   function clearToken() {
     accessToken.value = null
-    delete api.defaults.headers.common['Authorization']
+    clearAccessToken()
   }
 
   async function init() {
-    // Only try to restore session if we already have a token
-    const existingToken = localStorage.getItem('sindbad-access-token')
-    if (!existingToken) return
-    
+    // TOKEN STORAGE FIX: previously this gated session restore on
+    // `localStorage.getItem('sindbad-access-token')` — i.e. it would only
+    // ever try to restore a session if a *plaintext* access token had been
+    // persisted to disk on a prior visit. Since the access token is now
+    // in-memory only (see @/lib/tokenStore), that check is gone by
+    // construction: there is nothing in localStorage to check, and on a
+    // fresh page load the in-memory token is always empty.
+    //
+    // Instead, we unconditionally attempt a cookie-based refresh. If the
+    // browser is holding a valid httpOnly refresh cookie, this silently
+    // restores the session (new access token + user). If there is no cookie
+    // (or it's expired/revoked), this call 401s/errors and we fall through
+    // to "logged out" — which is the correct behavior.
+    //
+    // ⚠️ Depends on the backend actually setting that httpOnly cookie on
+    // login — see the BACKEND CONTRACT REQUIREMENT note in
+    // @/lib/tokenStore.ts. Until that ships, `init()` will always fail here
+    // and every full page reload will require a fresh login. That is
+    // expected during the migration window.
     try {
-      await fetchUser()
-    } catch {
-      // Token expired, try refresh once
-      try {
-        const res = await api.post('/api/v1/auth/refresh', {})
-        if (res.data.access_token) {
-          setToken(res.data.access_token)
-          user.value = normalizeUser(res.data.user)
-        }
-      } catch {
-        clearToken()
+      const res = await api.post('/api/v1/auth/refresh', {})
+      if (res.data?.access_token) {
+        setToken(res.data.access_token)
+        user.value = normalizeUser(res.data.user)
       }
+    } catch {
+      clearToken()
     }
   }
 
@@ -79,9 +116,13 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     try {
       const res = await api.post('/api/v1/auth/login', { email, password })
-      // Backend returns 'requires_mfa', frontend uses 'mfa_required'
-      const mfaRequired = res.data.mfa_required ?? res.data.requires_mfa ?? false
-      if (mfaRequired) {
+      // Backend returns `requires_mfa` (see backend/app/api/auth.py); some
+      // older frontend code paths also checked `mfa_required`. Kept as a
+      // dual-read for safety, but this is worth confirming against the real
+      // OpenAPI schema (`npm run gen:api`) during the verified build —
+      // if `mfa_required` is never actually sent by the backend, drop it.
+      const requiresMfa = res.data.mfa_required ?? res.data.requires_mfa ?? false
+      if (requiresMfa) {
         mfaRequired.value = true
         pendingEmail.value = email
         pendingPassword.value = password
