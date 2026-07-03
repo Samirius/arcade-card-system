@@ -14,7 +14,7 @@ from datetime import datetime
 import enum
 
 from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, Index, Integer, BigInteger
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from app.database import Base
 
@@ -92,6 +92,14 @@ class ChargeIdempotency(Base):
     Keyed uniquely on (company_id, client_txn_id). A repeat charge with the same
     client_txn_id returns the stored result WITHOUT debiting the card again.
     ``result_json`` stores the canonical response so replays are byte-identical.
+
+    Also reused (generalized) by the staff/cashier money endpoints
+    (``/cards/{uid}/add-credit`` and ``/cards/{uid}/charge`` — see
+    ``app.services.money.MoneyService.staff_idempotent_call``). Staff callers
+    namespace their ``client_txn_id`` (e.g. ``"staff:add-credit:<key>"``) so
+    their keys can never collide with device ``client_txn_id`` values sharing
+    the same table, and store their full JSON response in
+    ``result_payload`` — a column the device path never populates.
     """
     __tablename__ = "charge_idempotency"
 
@@ -110,6 +118,11 @@ class ChargeIdempotency(Base):
     server_txn_id = Column(String(255), nullable=False)
     balance_after_cents = Column(BigInteger, nullable=True)
     price_cents = Column(BigInteger, nullable=True)
+
+    # Generic JSON response payload (used by the staff/cashier idempotency
+    # path so arbitrary response shapes can be replayed byte-identical;
+    # NULL/unused for device /charge and /reconcile records).
+    result_payload = Column(JSONB, nullable=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, index=True)
 
