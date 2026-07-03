@@ -1,5 +1,5 @@
 """Authentication API routes"""
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
@@ -18,6 +18,39 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # Security
 security = HTTPBearer(auto_error=False)
+
+# Name of the httpOnly cookie carrying the refresh token.
+REFRESH_TOKEN_COOKIE_NAME = "refresh_token"
+
+
+def _set_refresh_cookie(response: Response, refresh_token_str: str) -> None:
+    """
+    Set the refresh token as an httpOnly, Secure, SameSite=Lax cookie.
+
+    Additive alongside the existing JSON ``refresh_token`` field (kept for
+    backward-compat) — this just also hands the token to the browser in a
+    form JS can't read, so the frontend can stop persisting it itself.
+    """
+    response.set_cookie(
+        key=REFRESH_TOKEN_COOKIE_NAME,
+        value=refresh_token_str,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
+        path="/",
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    """Clear the refresh token cookie (mirrors the attributes used to set it)."""
+    response.delete_cookie(
+        key=REFRESH_TOKEN_COOKIE_NAME,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        path="/",
+    )
 
 
 def validate_password_strength(password: str) -> bool:
@@ -185,6 +218,7 @@ async def register_user(
 @router.post("/login")
 async def login(
     request: Request,
+    response: Response,
     login_data: UserLogin,
     db: Session = Depends(get_db)
 ):
@@ -197,6 +231,8 @@ async def login(
             password=login_data.password,
             client_ip=client_ip
         )
+
+        _set_refresh_cookie(response, refresh_token)
 
         return {
             "access_token": access_token,
@@ -227,6 +263,7 @@ async def login(
 @router.post("/login/mfa")
 async def login_with_mfa(
     request: Request,
+    response: Response,
     body: dict = Body(default={}),
     db: Session = Depends(get_db)
 ):
@@ -245,6 +282,8 @@ async def login_with_mfa(
             mfa_code=mfa_code,
             client_ip=client_ip
         )
+
+        _set_refresh_cookie(response, refresh_token)
 
         return {
             "access_token": access_token,
@@ -274,15 +313,16 @@ async def login_with_mfa(
 @router.post("/refresh")
 async def refresh_token(
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     body: dict = Body(default={}),
 ):
-    """Refresh access token using refresh token from body or cookie."""
+    """Refresh access token using refresh token from body, cookie, or Authorization header."""
     try:
-        # Try body first, then cookie
+        # Try body first, then cookie, then Authorization header
         refresh_token_str = body.get("refresh_token")
         if not refresh_token_str:
-            refresh_token_str = request.cookies.get("refresh_token")
+            refresh_token_str = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
         if not refresh_token_str:
             # Try Authorization header
             auth_header = request.headers.get("Authorization", "")
@@ -298,6 +338,11 @@ async def refresh_token(
             db=db,
             refresh_token_str=refresh_token_str
         )
+
+        # Re-affirm the httpOnly cookie (same refresh token; only the access
+        # token is rotated by this endpoint) so the cookie's max-age slides
+        # forward on active use.
+        _set_refresh_cookie(response, refresh_token_str)
 
         return {
             "access_token": access_token,
@@ -370,6 +415,7 @@ async def verify_mfa_setup(
 @router.post("/logout")
 async def logout(
     request: Request,
+    response: Response,
     logout_data: dict = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -378,17 +424,12 @@ async def logout(
     from app.models.refresh_token import RefreshTokenBlacklist
     from hashlib import sha256
 
-    # Get refresh token from request body or authorization header
+    # Get refresh token from request body, falling back to the httpOnly cookie
     refresh_token = None
     if logout_data and "refresh_token" in logout_data:
         refresh_token = logout_data["refresh_token"]
-    else:
-        # Try to get from authorization header if Bearer token
-        auth_header = request.headers.get("authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            # This would be the access token, not refresh token
-            # We need the frontend to send refresh_token in body
-            pass
+    if not refresh_token:
+        refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
 
     # Invalidate all tokens by incrementing token version
     from sqlalchemy import text
@@ -413,6 +454,8 @@ async def logout(
 
         db.add(blacklist_entry)
         db.commit()
+
+    _clear_refresh_cookie(response)
 
     return {"message": "Logged out successfully", "tokens_revoked": True}
 

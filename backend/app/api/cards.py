@@ -1,5 +1,5 @@
 """Card management API routes"""
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Header
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from decimal import Decimal
@@ -17,6 +17,22 @@ from app.api.auth import get_current_user
 from app.utils.tenant import enforce_tenant_isolation
 
 router = APIRouter(prefix="/cards", tags=["cards"])
+
+
+def _resolve_idempotency_key(
+    idempotency_key_header: Optional[str], operation: BalanceOperation
+) -> Optional[str]:
+    """
+    Resolve the effective idempotency key for a staff money endpoint call.
+
+    Accepts either the ``Idempotency-Key`` header or the optional
+    ``client_txn_id`` body field; the header wins if both are supplied.
+    Returns ``None`` when neither is provided (fully backward-compatible:
+    no key => unchanged, non-idempotent behavior).
+    """
+    if idempotency_key_header:
+        return idempotency_key_header
+    return getattr(operation, "client_txn_id", None) or None
 
 
 def _check_card_tenant_access(db: Session, current_user: User, card: Card):
@@ -437,6 +453,7 @@ async def add_card_credit(
     card_uid: str,
     operation: BalanceOperation,
     payment_method: str = Query("CASH", description="Payment method: CASH, CARD, TRANSFER"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["STAFF", "SUPERVISOR", "REGIONAL_MGR", "OPERATIONS", "ADMIN", "OWNER"]))
 ):
@@ -448,8 +465,24 @@ async def add_card_credit(
     Staff can add credit for cash payments.
     Supervisors+ can also refund or adjust.
     Uses BalanceLedgerService for atomic operation + audit trail.
+
+    **Idempotency (optional):** supply an ``Idempotency-Key`` header or a
+    ``client_txn_id`` in the body (header takes precedence). Repeating the
+    same key for this tenant returns the original result WITHOUT adding the
+    credit again. Omit both for unchanged, non-idempotent behavior.
     """
     from app.services.ledger import BalanceLedgerService
+    from app.services.money import MoneyService
+
+    idem_key = _resolve_idempotency_key(idempotency_key, operation)
+    tenant_id = getattr(current_user, "company_id", None)
+
+    if idem_key:
+        cached = MoneyService.find_staff_idempotent_response(
+            db=db, tenant_id=tenant_id, endpoint="add-credit", idempotency_key=idem_key
+        )
+        if cached is not None:
+            return cached
 
     try:
         result = BalanceLedgerService.add_balance(
@@ -461,14 +494,31 @@ async def add_card_credit(
             metadata={"payment_method": payment_method, "endpoint": "add-credit"}
         )
 
-        return {
+        response = {
             "success": True,
             "message": f"Successfully added {operation.amount} credits to card",
             "card_uid": card_uid,
             "old_balance": result["balance_before"],
             "new_balance": result["balance_after"],
-            "transaction_id": None
+            "transaction_id": None,
+            "idempotent_replay": False,
         }
+
+        if idem_key:
+            # JSON-safe copy for persistence (Decimal -> str) before returning
+            # the live Decimal-bearing response to FastAPI for serialization.
+            response = MoneyService.record_staff_idempotent_response(
+                db=db,
+                tenant_id=tenant_id,
+                endpoint="add-credit",
+                idempotency_key=idem_key,
+                card_uid=card_uid,
+                response={**response, "old_balance": str(response["old_balance"]),
+                          "new_balance": str(response["new_balance"])},
+            )
+            # record_staff_idempotent_response returns the stored (string-balance)
+            # payload; the schema will happily coerce str -> Decimal.
+        return response
     except ValueError as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail="Card not found")
@@ -479,6 +529,7 @@ async def add_card_credit(
 async def charge_card(
     card_uid: str,
     operation: BalanceOperation,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["STAFF", "SUPERVISOR", "REGIONAL_MGR", "OPERATIONS", "ADMIN", "OWNER"]))
 ):
@@ -489,8 +540,24 @@ async def charge_card(
 
     Used when a customer plays a game or uses a service.
     Uses BalanceLedgerService for atomic operation + audit trail.
+
+    **Idempotency (optional):** supply an ``Idempotency-Key`` header or a
+    ``client_txn_id`` in the body (header takes precedence). Repeating the
+    same key for this tenant returns the original result WITHOUT charging the
+    card again. Omit both for unchanged, non-idempotent behavior.
     """
     from app.services.ledger import BalanceLedgerService
+    from app.services.money import MoneyService
+
+    idem_key = _resolve_idempotency_key(idempotency_key, operation)
+    tenant_id = getattr(current_user, "company_id", None)
+
+    if idem_key:
+        cached = MoneyService.find_staff_idempotent_response(
+            db=db, tenant_id=tenant_id, endpoint="charge", idempotency_key=idem_key
+        )
+        if cached is not None:
+            return cached
 
     try:
         result = BalanceLedgerService.deduct_balance(
@@ -502,15 +569,32 @@ async def charge_card(
             metadata={"endpoint": "charge"}
         )
 
-        return {
+        response = {
             "success": True,
             "message": f"Successfully charged {operation.amount} credits from card",
             "card_uid": card_uid,
             "old_balance": result["balance_before"],
             "new_balance": result["balance_after"],
             "amount_charged": operation.amount,
-            "transaction_id": None
+            "transaction_id": None,
+            "idempotent_replay": False,
         }
+
+        if idem_key:
+            response = MoneyService.record_staff_idempotent_response(
+                db=db,
+                tenant_id=tenant_id,
+                endpoint="charge",
+                idempotency_key=idem_key,
+                card_uid=card_uid,
+                response={
+                    **response,
+                    "old_balance": str(response["old_balance"]),
+                    "new_balance": str(response["new_balance"]),
+                    "amount_charged": str(response["amount_charged"]),
+                },
+            )
+        return response
     except ValueError as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail="Card not found")

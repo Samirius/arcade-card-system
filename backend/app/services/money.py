@@ -20,6 +20,13 @@ from app.models.card import Card, CardStatus
 from app.models.device import ChargeIdempotency, HouseAccount
 from app.services.ledger import BalanceLedgerService
 
+# Sentinel "no tenant" bucket for staff/cashier idempotency records whose
+# acting user / card has no company_id (super-admin context). This is purely
+# a partition key for the ChargeIdempotency unique index — it has no bearing
+# on authorization or tenant isolation, which are enforced independently by
+# the calling endpoints before MoneyService is ever invoked.
+UNSCOPED_TENANT_ID = uuid.UUID(int=0)
+
 
 def _cents_to_decimal(cents: int) -> Decimal:
     """Convert integer cents to a 2-dp Decimal (dollars)."""
@@ -209,6 +216,92 @@ class MoneyService:
         )
         balance_after_cents = _decimal_to_cents(result["balance_after"])
         return _record_and_return("approved", balance_after_cents)
+
+    # ------------------------------------------------------------------ #
+    # Staff / cashier idempotency (generalized reuse of ChargeIdempotency)
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _staff_scope_key(endpoint: str, idempotency_key: str) -> str:
+        """
+        Namespace a staff-supplied idempotency key so it can never collide
+        with a device ``client_txn_id`` sharing the same ``charge_idempotency``
+        table (and so ``add-credit`` and ``charge`` keys can't collide with
+        each other either).
+        """
+        return f"staff:{endpoint}:{idempotency_key}"
+
+    @staticmethod
+    def find_staff_idempotent_response(
+        db: Session,
+        tenant_id: Optional[uuid.UUID],
+        endpoint: str,
+        idempotency_key: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Look up a previously-recorded response for a staff/cashier money
+        endpoint call. Returns the stored JSON response dict (with
+        ``idempotent_replay: True`` merged in) if this ``(tenant, endpoint,
+        idempotency_key)`` was already processed, else ``None``.
+        """
+        scoped_company_id = tenant_id if tenant_id is not None else UNSCOPED_TENANT_ID
+        scope_key = MoneyService._staff_scope_key(endpoint, idempotency_key)
+
+        existing = MoneyService._existing_idempotency(db, scoped_company_id, scope_key)
+        if not existing or existing.result_payload is None:
+            return None
+
+        response = dict(existing.result_payload)
+        response["idempotent_replay"] = True
+        return response
+
+    @staticmethod
+    def record_staff_idempotent_response(
+        db: Session,
+        tenant_id: Optional[uuid.UUID],
+        endpoint: str,
+        idempotency_key: str,
+        card_uid: str,
+        response: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Persist ``response`` as the canonical result for this ``(tenant,
+        endpoint, idempotency_key)`` so a replay returns it without
+        re-applying the balance change. Commits immediately (the caller's
+        balance mutation is already committed by this point via
+        ``BalanceLedgerService``).
+
+        On a unique-constraint race (two concurrent identical requests), the
+        winner's stored response is returned instead of raising — mirroring
+        the device charge path's concurrency handling.
+        """
+        scoped_company_id = tenant_id if tenant_id is not None else UNSCOPED_TENANT_ID
+        scope_key = MoneyService._staff_scope_key(endpoint, idempotency_key)
+
+        record = ChargeIdempotency(
+            company_id=scoped_company_id,
+            client_txn_id=scope_key,
+            card_uid=card_uid,
+            device_id=None,
+            result="approved",
+            server_txn_id=str(uuid.uuid4()),
+            balance_after_cents=None,
+            price_cents=None,
+            result_payload=response,
+        )
+        db.add(record)
+        try:
+            db.commit()
+        except IntegrityError:
+            # Concurrent duplicate request already recorded the result first —
+            # return that authoritative response rather than erroring.
+            db.rollback()
+            winner = MoneyService._existing_idempotency(db, scoped_company_id, scope_key)
+            if winner and winner.result_payload is not None:
+                winner_response = dict(winner.result_payload)
+                winner_response["idempotent_replay"] = True
+                return winner_response
+            raise
+        return response
 
     # ------------------------------------------------------------------ #
     # Reconcile (offline batch replay)

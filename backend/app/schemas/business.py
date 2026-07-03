@@ -175,6 +175,16 @@ class BalanceOperation(BaseModel):
     """Schema for balance operations"""
     amount: Decimal = Field(..., gt=0, description="Amount to add or deduct")
     notes: Optional[str] = Field(None, max_length=500)
+    client_txn_id: Optional[str] = Field(
+        None,
+        max_length=255,
+        description="Optional client-generated idempotency key. A repeat call with "
+                     "the same key (for the same card/endpoint) returns the original "
+                     "result without re-applying the balance change. Equivalent to "
+                     "sending an 'Idempotency-Key' header (the header takes "
+                     "precedence if both are supplied). Omit for unchanged, "
+                     "non-idempotent behavior."
+    )
 
 
 class BalanceAddResponse(BaseModel):
@@ -185,6 +195,11 @@ class BalanceAddResponse(BaseModel):
     old_balance: Decimal
     new_balance: Decimal
     transaction_id: Optional[uuid.UUID] = None
+    idempotent_replay: bool = Field(
+        default=False,
+        description="True if this response was replayed from a prior identical "
+                     "request via Idempotency-Key/client_txn_id (balance was NOT re-applied)."
+    )
 
 
 class BalanceChargeResponse(BaseModel):
@@ -196,6 +211,11 @@ class BalanceChargeResponse(BaseModel):
     new_balance: Decimal
     amount_charged: Decimal
     transaction_id: Optional[uuid.UUID] = None
+    idempotent_replay: bool = Field(
+        default=False,
+        description="True if this response was replayed from a prior identical "
+                     "request via Idempotency-Key/client_txn_id (balance was NOT re-applied)."
+    )
 
 
 # ============================================================================
