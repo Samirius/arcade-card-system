@@ -7,6 +7,9 @@ from typing import Optional
 from datetime import datetime, timedelta
 import re
 
+from sqlalchemy import text, event
+from sqlalchemy.orm import Session as _SASession
+
 from app.database import get_db
 from app.models.user import User, UserRole, UserStatus
 from app.schemas.user import UserLogin
@@ -15,6 +18,113 @@ from app.config import settings
 
 # Create router
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+# --------------------------------------------------------------------------- #
+# BE-1: Per-request PostgreSQL Row-Level Security (RLS) tenant context.
+#
+# The RLS policies (see migration `rls_tenant_isolation_0001`) scope every
+# tenant DATA table by two GUCs — `app.tenant_id` and `app.is_superadmin` —
+# which the auth dependencies set per request via SET LOCAL / set_config.
+# --------------------------------------------------------------------------- #
+
+# Key under which the resolved per-request tenant context is stashed on the
+# SQLAlchemy Session's ``info`` dict.
+_TENANT_INFO_KEY = "rls_tenant_context"
+
+
+def _apply_tenant_guc(connection, tenant_str: str, is_superadmin_flag: str) -> None:
+    """Emit the transaction-scoped RLS GUCs on ``connection``.
+
+    Uses ``set_config(key, value, is_local=true)`` — the exact functional
+    equivalent of ``SET LOCAL key = value`` (transaction-scoped), but with the
+    value passed as a *bound parameter* so there is no SQL-injection surface
+    from the (already trusted) company UUID.
+    """
+    connection.exec_driver_sql(
+        "SELECT set_config('app.tenant_id', %s, true), "
+        "set_config('app.is_superadmin', %s, true)",
+        (tenant_str, is_superadmin_flag),
+    )
+
+
+@event.listens_for(_SASession, "after_begin")
+def _reapply_tenant_context_on_begin(session, transaction, connection):
+    """Re-establish the tenant GUCs at the start of EVERY transaction.
+
+    ``SET LOCAL`` / ``set_config(..., is_local=true)`` only lives for the
+    duration of one transaction, and the app frequently commits mid-request and
+    then keeps querying (e.g. ``create_card`` commits then ``db.refresh``s,
+    ledger writes commit then refresh). Without re-applying, those follow-up
+    statements would run with NO tenant context and RLS would filter out the
+    just-written rows (fail-closed). This listener fires on each new
+    transaction for the session and re-applies whatever context the auth
+    dependency stored, so tenant scoping is continuous for the whole request
+    while remaining strictly transaction-scoped (nothing leaks across pooled
+    connections — the value is re-set per transaction, and SET LOCAL is cleared
+    on commit/rollback/return-to-pool).
+    """
+    ctx = session.info.get(_TENANT_INFO_KEY)
+    if ctx is None:
+        return
+    _apply_tenant_guc(connection, ctx["tenant_str"], ctx["is_superadmin_flag"])
+
+
+def begin_credential_lookup(db: Session) -> None:
+    """Open an RLS bypass window for authenticating a bearer credential.
+
+    Some principals must be resolved by a GLOBAL secret credential *before* any
+    tenant context can exist — e.g. a device is looked up by its
+    ``device_token_hash``, which is not scoped to a company. Because ``devices``
+    carries a ``company_id`` it is under RLS, so with no tenant context set the
+    lookup would match zero rows (fail-closed) and authentication would wrongly
+    fail with "invalid token".
+
+    This mirrors why the ``users`` table is exempt from RLS entirely (login
+    resolves a user by email before a tenant exists). Here we scope the bypass
+    as narrowly as possible: set ``app.is_superadmin='on'`` only for the single
+    indexed credential-hash SELECT, then the caller MUST immediately pin the
+    real tenant context via :func:`set_tenant_context` (is_superadmin=False)
+    for every subsequent money query. The bypass is transaction-scoped
+    (``set_config(..., is_local=true)``); it does not persist and is NOT stored
+    on ``session.info``, so the ``after_begin`` listener will not re-apply it.
+    """
+    db.execute(text("SELECT set_config('app.is_superadmin', 'on', true)"))
+
+
+def set_tenant_context(db: Session, company_id, is_superadmin: bool) -> None:
+    """Bind the RLS tenant context to ``db`` for the rest of the request.
+
+    Stores the resolved context on ``db.info`` so the ``after_begin`` listener
+    re-applies it at the start of every transaction on this session (surviving
+    the app's intra-request commits), and applies it immediately to the
+    currently-open transaction so it takes effect for the very next statement.
+
+    The two GUCs the RLS policies read (see the ``rls_tenant_isolation``
+    migration):
+
+    * ``app.tenant_id``     — the caller's ``company_id`` as text, or ``''`` when
+      NULL. The policy runs it through ``NULLIF(...,'')::uuid``.
+    * ``app.is_superadmin`` — ``'on'`` for a super-admin (``company_id IS NULL``),
+      else ``'off'``.
+    """
+    tenant_str = "" if company_id is None else str(company_id)
+    flag = "on" if is_superadmin else "off"
+
+    # Persist for subsequent transactions on this session (via after_begin).
+    db.info[_TENANT_INFO_KEY] = {
+        "tenant_str": tenant_str,
+        "is_superadmin_flag": flag,
+    }
+
+    # Apply now to the already-open transaction (a query has already run in the
+    # auth dependency, so a transaction is active). If for some reason none is
+    # open, the after_begin listener will apply it when the next one starts.
+    db.execute(
+        text("SELECT set_config('app.tenant_id', :cid, true), "
+             "set_config('app.is_superadmin', :flag, true)"),
+        {"cid": tenant_str, "flag": flag},
+    )
 
 # Security
 security = HTTPBearer(auto_error=False)
@@ -167,6 +277,15 @@ async def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token has been revoked"
             )
+
+    # Bind the per-request RLS tenant context on this session's transaction so
+    # every subsequent query in this request is scoped to the user's company.
+    # company_id IS NULL means a super-admin (sees all tenants).
+    set_tenant_context(
+        db,
+        company_id=user.company_id,
+        is_superadmin=user.company_id is None,
+    )
 
     return user
 
