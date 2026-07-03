@@ -9,6 +9,7 @@ from app.models.machine import Machine, MachineType, MachineStatus
 from app.models.company import Company
 from app.models.balance import BalanceLedger, BalanceSnapshot
 from app.models.offline import OfflineToken, OfflineTransaction
+from app.models.device import Device, DeviceStatus, ChargeIdempotency, HouseAccount
 
 __all__ = [
     "User",
@@ -32,4 +33,8 @@ __all__ = [
     "BalanceSnapshot",
     "OfflineToken",
     "OfflineTransaction",
+    "Device",
+    "DeviceStatus",
+    "ChargeIdempotency",
+    "HouseAccount",
 ]

@@ -53,6 +53,10 @@ htmlcov/
 # Alembic
 alembic/versions/*.pyc
 
+# Offline signing key (generated secret; provide via OFFLINE_SIGNING_KEY in prod)
+.offline_signing_key
+backend/.offline_signing_key
+
 # Temporary files
 tmp/
 temp/
