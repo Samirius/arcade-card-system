@@ -1,7 +1,6 @@
 """Company (tenant) model for multi-tenancy"""
 from sqlalchemy import Column, String, DateTime, Boolean, Integer, Index
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
 from enum import Enum

@@ -1,6 +1,5 @@
 """Authentication API routes"""
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
-from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
@@ -10,7 +9,7 @@ import re
 
 from app.database import get_db
 from app.models.user import User, UserRole, UserStatus
-from app.schemas.user import UserCreate, UserResponse, UserLogin
+from app.schemas.user import UserLogin
 from app.services.auth import AuthService
 from app.config import settings
 
@@ -377,7 +376,6 @@ async def logout(
 ):
     """Logout user."""
     from app.models.refresh_token import RefreshTokenBlacklist
-    from app.utils.jwt import create_access_token
     from hashlib import sha256
 
     # Get refresh token from request body or authorization header

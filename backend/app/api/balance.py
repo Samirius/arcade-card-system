@@ -4,10 +4,9 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 from decimal import Decimal
-import uuid
 
 from app.database import get_db
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas.balance import (
     BalanceOperationRequest,
     BalanceHistoryResponse,
@@ -230,7 +229,6 @@ async def get_company_balance_stats(
     """
     from app.models.balance import BalanceLedger
     from app.utils.tenant import get_user_company_id
-    from decimal import Decimal
 
     company_id = get_user_company_id(current_user)
 

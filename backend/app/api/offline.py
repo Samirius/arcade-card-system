@@ -1,12 +1,11 @@
 """Offline token API endpoints for device-side play management"""
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
-from decimal import Decimal
 
 from app.database import get_db
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas.offline import (
     OfflineTokenIssueRequest,
     OfflineTokenResponse,

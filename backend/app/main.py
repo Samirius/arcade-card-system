@@ -1,7 +1,6 @@
 """FastAPI application with security"""
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from app.config import settings
@@ -14,6 +13,7 @@ from app.api.dashboard import router as dashboard_router
 from app.api.companies import router as companies_router
 from app.api.balance import router as balance_router
 from app.api.offline import router as offline_router
+from app.api.users import router as users_router
 from app.database import engine, Base
 from app.logging import setup_logging
 from app.exceptions import http_exception_handler, validation_exception_handler, general_exception_handler
@@ -82,6 +82,7 @@ app.include_router(dashboard_router, prefix=api_prefix)
 app.include_router(companies_router, prefix=api_prefix)
 app.include_router(balance_router, prefix=api_prefix)
 app.include_router(offline_router, prefix=api_prefix)
+app.include_router(users_router, prefix=api_prefix)
 
 
 @app.get("/")

@@ -1,8 +1,7 @@
 """Email verification utilities"""
 from datetime import datetime, timedelta
 from typing import Optional
-import secrets
-from jose import jwt, JWTError
+from jose import jwt
 
 from app.config import settings
 
@@ -39,7 +38,7 @@ def verify_email_token(token: str) -> Optional[str]:
         Email address if valid, None otherwise
     """
     try:
-        from jose import JWTError, jwt
+        from jose import JWTError
         payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
 
         # Check token type
