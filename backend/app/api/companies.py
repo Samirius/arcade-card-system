@@ -1,7 +1,7 @@
 """Company management endpoints for multi-tenant system"""
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List
 from datetime import datetime, timedelta
 import uuid
 

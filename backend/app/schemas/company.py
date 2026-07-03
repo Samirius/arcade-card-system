@@ -1,6 +1,6 @@
 """Company schemas for API validation"""
-from pydantic import BaseModel, EmailStr, Field, HttpUrl
-from typing import Optional, List
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional
 from datetime import datetime
 from enum import Enum
 

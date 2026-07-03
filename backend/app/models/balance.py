@@ -1,12 +1,11 @@
 """Balance ledger model for tracking all balance changes"""
 from sqlalchemy import Column, String, DECIMAL, DateTime, Integer, ForeignKey, Index, UUID
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
 
 from app.database import Base
-from app.models.card import Transaction
 
 
 class BalanceLedger(Base):

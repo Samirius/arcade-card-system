@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 import uuid
 
-from app.models import User, Card, Transaction
+from app.models import User
 
 
 def get_user_company_id(user) -> Optional[uuid.UUID]:
@@ -128,9 +128,10 @@ def create_isolation_middleware():
     Returns:
         FastAPI dependency function
     """
-    from fastapi import HTTPException, status
+    from fastapi import HTTPException, status, Depends
     from app.api.auth import get_current_user
-    
+    from app.database import get_db
+
     async def check_tenant_isolation(
         current_user: User = Depends(get_current_user),
         resource_company_id: uuid.UUID = None,

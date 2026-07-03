@@ -1,12 +1,11 @@
 """Balance ledger service for server-authoritative balance management"""
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 
 from app.models.balance import BalanceLedger, BalanceSnapshot
-from app.models.card import Card, Transaction
-from app.models.user import User
+from app.models.card import Card
 
 
 class BalanceLedgerService:

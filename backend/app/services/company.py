@@ -5,7 +5,6 @@ from datetime import datetime
 import uuid
 
 from app.models.company import Company, CompanyPlan, CompanyStatus
-from app.models.user import User
 from app.schemas.company import CompanyCreate, CompanyUpdate
 
 
