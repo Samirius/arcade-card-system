@@ -172,7 +172,3 @@ class User(Base):
         if self.status == UserStatus.LOCKED:
             self.locked_until = None
             self.status = UserStatus.ACTIVE
-
-
-# Add timedelta import for date calculations
-from datetime import timedelta

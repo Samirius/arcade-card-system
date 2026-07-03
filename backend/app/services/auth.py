@@ -1,9 +1,8 @@
 """Authentication service for user management"""
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
 
 from app.models.user import User, UserRole, UserStatus
 from app.utils.password import hash_password, verify_password
@@ -273,7 +272,7 @@ class AuthService:
         Raises:
             ValueError: If refresh token invalid or blacklisted
         """
-        from app.utils.jwt import decode_token, verify_refresh_token
+        from app.utils.jwt import verify_refresh_token
 
         # verify_refresh_token checks blacklist if db is provided
         payload = verify_refresh_token(refresh_token_str, db=db)

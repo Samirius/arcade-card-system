@@ -1,15 +1,13 @@
 """Offline token management service for device-side play"""
 from sqlalchemy.orm import Session
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 from decimal import Decimal
 import uuid
-import json
 
 from jose import jwt
 from app.models.offline import OfflineToken, OfflineTransaction
 from app.models.card import Card
-from app.models.user import User
 from app.config import settings
 
 

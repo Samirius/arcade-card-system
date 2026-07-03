@@ -1,13 +1,9 @@
 """Offline signed token model for device-side play without connectivity"""
 from sqlalchemy import Column, String, DateTime, Integer, UUID, Index, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import relationship
-from datetime import datetime, timedelta
+from datetime import datetime
 import uuid
 
 from app.database import Base
-from app.models.card import Card
-from app.models.user import User
 
 
 class OfflineToken(Base):

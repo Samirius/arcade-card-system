@@ -8,10 +8,9 @@ from decimal import Decimal
 
 from app.database import get_db
 from app.models import Transaction, Card, User
-from app.schemas.business import TransactionCreate, TransactionResponse, TransactionListFilter
+from app.schemas.business import TransactionCreate, TransactionResponse
 from app.utils.audit import log_action
 from app.api.authorization import require_role
-from app.utils.tenant import enforce_tenant_isolation
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 

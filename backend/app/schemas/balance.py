@@ -1,7 +1,6 @@
 """Balance operation schemas for API validation"""
-from pydantic import BaseModel, Field, HttpUrl
-from typing import Optional, List, Dict, Any
-from datetime import datetime
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any
 from decimal import Decimal
 
 

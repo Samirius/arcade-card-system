@@ -2,16 +2,12 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from app.database import get_db
-from app.models import Card, Transaction, Machine, Location, User
-from app.schemas.business import (
-    DashboardStatsResponse, DashboardCardsResponse,
-    DashboardRevenueResponse
-)
+from app.models import Card, Transaction, Machine, User
+from app.schemas.business import DashboardStatsResponse
 from app.api.authorization import require_role
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -29,7 +25,7 @@ async def get_dashboard_stats(
 
     Returns revenue, cards, transactions, and machine statistics.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = today_start - timedelta(days=7)
     month_start = today_start - timedelta(days=30)

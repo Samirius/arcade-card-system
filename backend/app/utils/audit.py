@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 
-from app.database import get_db
 from app.models.audit import AuditLog, AuditAction
 
 
