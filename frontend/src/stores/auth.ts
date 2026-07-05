@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { api } from '@/config/api'
+import { api, setAuthToken, onTokenRefresh } from '@/config/api'
 
 export interface User {
   id: string
@@ -45,33 +45,38 @@ export const useAuthStore = defineStore('auth', () => {
 
   function setToken(token: string) {
     accessToken.value = token
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    setAuthToken(token)
   }
 
   function clearToken() {
     accessToken.value = null
-    delete api.defaults.headers.common['Authorization']
+    setAuthToken(null)
   }
 
-  async function init() {
-    // Only try to restore session if we already have a token
-    const existingToken = localStorage.getItem('sindbad-access-token')
-    if (!existingToken) return
-    
-    try {
-      await fetchUser()
-    } catch {
-      // Token expired, try refresh once
-      try {
-        const res = await api.post('/api/v1/auth/refresh', {})
-        if (res.data.access_token) {
-          setToken(res.data.access_token)
-          user.value = normalizeUser(res.data.user)
+  // Keep the store in sync when the axios layer silently refreshes (or drops) the token.
+  onTokenRefresh((token) => {
+    accessToken.value = token
+  })
+
+  // Session restore runs once per app load. Tokens are held in memory only;
+  // the httpOnly refresh cookie (set by the backend on login) is the sole
+  // persistent credential — nothing is ever written to localStorage.
+  let initPromise: Promise<void> | null = null
+  function init(): Promise<void> {
+    if (!initPromise) {
+      initPromise = (async () => {
+        try {
+          const res = await api.post('/api/v1/auth/refresh', {})
+          if (res.data?.access_token) {
+            setToken(res.data.access_token)
+            user.value = normalizeUser(res.data.user)
+          }
+        } catch {
+          // No valid refresh cookie — stay logged out; router guard redirects.
         }
-      } catch {
-        clearToken()
-      }
+      })()
     }
+    return initPromise
   }
 
   async function login(email: string, password: string) {
@@ -79,9 +84,10 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     try {
       const res = await api.post('/api/v1/auth/login', { email, password })
-      // Backend returns 'requires_mfa', frontend uses 'mfa_required'
-      const mfaRequired = res.data.mfa_required ?? res.data.requires_mfa ?? false
-      if (mfaRequired) {
+      // Backend returns 'requires_mfa' (read 'mfa_required' too, defensively).
+      // NOTE: local name must NOT shadow the `mfaRequired` ref above.
+      const needsMfa = res.data.mfa_required ?? res.data.requires_mfa ?? false
+      if (needsMfa) {
         mfaRequired.value = true
         pendingEmail.value = email
         pendingPassword.value = password
