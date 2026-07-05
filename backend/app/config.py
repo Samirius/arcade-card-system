@@ -37,6 +37,27 @@ RATE_LIMIT_PER_MINUTE = 100
 HOST = "0.0.0.0"
 PORT = 8000
 
+# Schema management
+# ------------------
+# Alembic is the single source of truth for the database schema. Historically
+# the app's lifespan also called Base.metadata.create_all(), which is a
+# second, independent way tables get created (it does NOT create RLS
+# policies, constraints added via raw op.execute(), etc. — only the Alembic
+# migrations do). Having both active is a dual-source-of-truth hazard.
+#
+# auto_create_tables gates that legacy create_all() call:
+#   - defaults to True when ENVIRONMENT != "production" (keeps dev/test/CI
+#     working out of the box, no migration step required to boot locally)
+#   - defaults to False when ENVIRONMENT == "production" (schema must be
+#     migration-driven; create_all() never runs, and never silently applies
+#     partial/incorrect schema for a role/table it doesn't fully understand)
+#   - can be force-overridden either way via AUTO_CREATE_TABLES=true|false
+_auto_create_tables_env = os.getenv("AUTO_CREATE_TABLES")
+if _auto_create_tables_env is not None:
+    AUTO_CREATE_TABLES = _auto_create_tables_env.lower() == "true"
+else:
+    AUTO_CREATE_TABLES = ENVIRONMENT != "production"
+
 class Settings:
     """Application settings"""
     
@@ -60,7 +81,10 @@ class Settings:
     
     # Rate limiting
     rate_limit_per_minute: int = RATE_LIMIT_PER_MINUTE
-    
+
+    # Schema management (see AUTO_CREATE_TABLES computation above)
+    auto_create_tables: bool = AUTO_CREATE_TABLES
+
     # JWT settings
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
