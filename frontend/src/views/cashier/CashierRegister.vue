@@ -17,13 +17,17 @@ const form = reactive({
 const saving = ref(false)
 
 async function handleRegister() {
-  if (!form.uid.trim()) return
+  // Backend contract (CardCreate): card_uid + owner are REQUIRED.
+  if (!form.uid.trim() || !form.customer_name.trim()) {
+    toast.add({ severity: 'warn', summary: t('common.error'), detail: t('card.uid') + ' + ' + t('card.customer'), life: 3000 })
+    return
+  }
   saving.value = true
   try {
     const res = await api.post('/api/v1/cards/', {
-      uid: form.uid,
+      card_uid: form.uid.trim(),
+      owner: form.customer_name.trim(),
       card_type: form.card_type,
-      customer_name: form.customer_name || undefined,
     })
     toast.add({ severity: 'success', summary: t('common.success'), life: 3000 })
     router.push(`/cashier/balance/${res.data.uid}`)
