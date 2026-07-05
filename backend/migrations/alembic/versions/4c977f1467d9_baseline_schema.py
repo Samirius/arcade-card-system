@@ -524,3 +524,10 @@ def downgrade() -> None:
     op.drop_index('idx_audit_logs_action', table_name='audit_logs')
     op.drop_table('audit_logs')
     # ### end Alembic commands ###
+
+    # Drop the ENUM types created by this migration's tables. drop_table does
+    # NOT drop the types, which broke downgrade -> re-upgrade cycles with
+    # DuplicateObject ("type audit_action already exists").
+    for enum_name in ('audit_action', 'card_status', 'card_type',
+                      'device_status', 'user_role', 'user_status'):
+        op.execute(f'DROP TYPE IF EXISTS {enum_name}')
