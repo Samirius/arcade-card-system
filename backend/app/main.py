@@ -34,12 +34,24 @@ async def lifespan(app: FastAPI):
     print(f"🔒 Debug mode: {settings.debug}")
 
     # Create database tables
-    try:
-        print("📦 Creating database tables...")
-        Base.metadata.create_all(bind=engine)
-        print("✅ Database tables created successfully")
-    except Exception as e:
-        print(f"❌ Error creating database tables: {e}")
+    #
+    # Alembic (backend/migrations/alembic) is the single source of truth for
+    # the schema. This create_all() call is a legacy convenience for local
+    # dev/test so the app boots against an empty database with zero setup.
+    # It is gated behind settings.auto_create_tables (see app/config.py):
+    # disabled by default in production, where the schema must be applied
+    # via `alembic upgrade head` ahead of time (create_all() cannot create
+    # RLS policies or other migration-only DDL, so relying on it in
+    # production would silently leave the schema incomplete).
+    if settings.auto_create_tables:
+        try:
+            print("📦 Creating database tables...")
+            Base.metadata.create_all(bind=engine)
+            print("✅ Database tables created successfully")
+        except Exception as e:
+            print(f"❌ Error creating database tables: {e}")
+    else:
+        print("📦 Skipping create_all(): schema managed by Alembic")
 
     yield
 

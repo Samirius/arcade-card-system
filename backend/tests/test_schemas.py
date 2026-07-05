@@ -18,7 +18,8 @@ def test_user_schemas_import():
     )
     assert user.email == "test@example.com"
     assert user.password == "Secure123"
-    assert user.role == "STAFF"
+    # role is intentionally NOT client-settable (assigned server-side) — must not be a field
+    assert "role" not in UserCreate.model_fields
 
 
 def test_user_validation():
