@@ -10,7 +10,8 @@ const direction = computed(() => (localeStore.isArabic ? 'rtl' : 'ltr'))
 const localeClass = computed(() => (localeStore.isArabic ? 'locale-ar' : 'locale-en'))
 
 onMounted(() => {
-  // Restore session on refresh
+  // Restore saved language (sets dir/lang on <html>) and session on refresh
+  localeStore.init()
   authStore.init()
 })
 </script>
