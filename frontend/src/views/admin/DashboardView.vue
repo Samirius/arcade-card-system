@@ -8,11 +8,12 @@ import PageHeader from '@/components/layout/PageHeader.vue'
 const { t } = useI18n()
 
 const loading = ref(true)
+// Field names match the backend /dashboard/stats contract exactly.
 const stats = ref({
   revenue_today: 0,
-  active_cards: 0,
+  cards_active: 0,
   transactions_today: 0,
-  total_cards: 0,
+  cards_total: 0,
 })
 const recentTransactions = ref<any[]>([])
 const revenueData = ref<{ labels: string[]; values: number[] }>({ labels: [], values: [] })
@@ -27,9 +28,11 @@ async function loadData() {
     ])
     stats.value = statsRes.data
     recentTransactions.value = recentRes.data
+    // /dashboard/revenue returns an OBJECT: { period, by_day: [{date, revenue}], ... }
+    const byDay = revenueRes.data?.by_day ?? []
     revenueData.value = {
-      labels: revenueRes.data.map((r: any) => r.date),
-      values: revenueRes.data.map((r: any) => r.revenue),
+      labels: byDay.map((r: any) => r.date),
+      values: byDay.map((r: any) => Number(r.revenue)),
     }
   } catch (err) {
     // Handle gracefully
@@ -38,8 +41,9 @@ async function loadData() {
   }
 }
 
-function formatAmount(amount: number) {
-  return new Intl.NumberFormat('ar-EG', { minimumFractionDigits: 0 }).format(amount)
+function formatAmount(amount: number | string) {
+  // Backend serializes DECIMAL as string — coerce before formatting.
+  return new Intl.NumberFormat('ar-EG', { minimumFractionDigits: 0 }).format(Number(amount) || 0)
 }
 
 onMounted(loadData)
@@ -61,7 +65,7 @@ onMounted(loadData)
       />
       <StatCard
         :label="t('dashboard.activeCards')"
-        :value="stats.active_cards"
+        :value="stats.cards_active"
         icon="pi-id-card"
         color="primary"
         :loading="loading"
@@ -75,7 +79,7 @@ onMounted(loadData)
       />
       <StatCard
         :label="t('dashboard.cardsIssued')"
-        :value="stats.total_cards"
+        :value="stats.cards_total"
         icon="pi-credit-card"
         color="info"
         :loading="loading"
