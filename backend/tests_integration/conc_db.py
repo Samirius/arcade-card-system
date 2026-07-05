@@ -1,8 +1,11 @@
 import os, threading, uuid
 from decimal import Decimal
-os.environ["SECRET_KEY"]="verification_secret_key_0123456789_abcdef"
-os.environ["DATABASE_URL"]="postgresql://arcade_user:arcade_password@localhost:5433/arcade_management"
-os.environ["ENVIRONMENT"]="development"; os.environ["DEBUG"]="false"
+# setdefault so a caller's env (e.g. CI's DATABASE_URL on port 5432) wins;
+# the values below are only local-dev fallbacks.
+os.environ.setdefault("SECRET_KEY", "verification_secret_key_0123456789_abcdef")
+os.environ.setdefault("DATABASE_URL", "postgresql://arcade_user:arcade_password@localhost:5433/arcade_management")
+os.environ.setdefault("ENVIRONMENT", "development")
+os.environ.setdefault("DEBUG", "false")
 from app.database import SessionLocal
 from app.models.card import Card, Transaction, CardStatus, CardType
 
