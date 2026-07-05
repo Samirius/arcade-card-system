@@ -6,15 +6,29 @@ export const api = axios.create({
   withCredentials: true, // for httpOnly refresh cookie
 })
 
+// --- In-memory access token (XSS-hardened: never persisted to storage) ---
+// The httpOnly refresh cookie (withCredentials) is the only persistent
+// credential; the access token lives in this module for the tab's lifetime.
+let accessToken: string | null = null
+let refreshListeners: Array<(token: string | null) => void> = []
+
+export function setAuthToken(token: string | null) {
+  accessToken = token
+}
+
+/** Register a callback fired when the axios layer refreshes or drops the token. */
+export function onTokenRefresh(cb: (token: string | null) => void) {
+  refreshListeners.push(cb)
+}
+
+function notifyTokenRefresh(token: string | null) {
+  refreshListeners.forEach((cb) => cb(token))
+}
+
 // --- Request interceptor: attach access token ---
-// ⚠️ SECURITY NOTE: Token stored in localStorage is vulnerable to XSS.
-// For production hardening, migrate to in-memory token storage with
-// httpOnly cookie for refresh token (backend already supports withCredentials).
-// See audit item H5 for details.
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('sindbad-access-token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`
   }
   return config
 })
@@ -91,10 +105,11 @@ api.interceptors.response.use(
     isRefreshing = true
 
     try {
-      const refreshToken = localStorage.getItem('sindbad-refresh-token')
-      const res = await api.post('/api/v1/auth/refresh', { refresh_token: refreshToken })
+      // The httpOnly refresh cookie authenticates this call (withCredentials).
+      const res = await api.post('/api/v1/auth/refresh', {})
       const newToken = res.data.access_token
-      localStorage.setItem('sindbad-access-token', newToken)
+      setAuthToken(newToken)
+      notifyTokenRefresh(newToken)
 
       processQueue(null, newToken)
       originalRequest.headers.Authorization = `Bearer ${newToken}`
@@ -102,8 +117,8 @@ api.interceptors.response.use(
     } catch (refreshErr) {
       processQueue(refreshErr, null)
       // Clear token silently — don't force redirect (let router guard handle it)
-      localStorage.removeItem('sindbad-access-token')
-      localStorage.removeItem('sindbad-refresh-token')
+      setAuthToken(null)
+      notifyTokenRefresh(null)
       delete originalRequest.headers.Authorization
       return Promise.reject(refreshErr)
     } finally {
