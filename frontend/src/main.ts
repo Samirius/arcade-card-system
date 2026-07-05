@@ -2,7 +2,6 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import PrimeVue from 'primevue/config'
 import Aura from '@primevue/themes/aura'
-import { createI18n } from 'vue-i18n'
 import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
 
@@ -12,16 +11,8 @@ import './assets/styles/global.scss'
 import './assets/styles/theme.scss'
 import './assets/styles/rtl.scss'
 
-// --- i18n ---
-import ar from '../public/locales/ar.json'
-import en from '../public/locales/en.json'
-
-const i18n = createI18n({
-  legacy: false,
-  locale: 'ar',
-  fallbackLocale: 'en',
-  messages: { ar, en },
-})
+// --- i18n (shared instance; locale store keeps it in sync) ---
+import { i18n } from './i18n'
 
 // --- PrimeVue theme ---
 const app = createApp(App)
