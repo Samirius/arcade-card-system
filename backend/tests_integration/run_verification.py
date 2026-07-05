@@ -109,8 +109,16 @@ with TestClient(app, raise_server_exceptions=False) as c:
             rm = c.post(f"{API}/auth/login/mfa", json={"email": e1, "password": PW, "mfa_code": code2})
             rec("MFA login (/login/mfa) -> 200", rm.status_code == 200, f"{rm.status_code} {rm.text[:80]}")
 
-    # 6. Privileged login deadlock: ADMIN needs MFA to login but can't set up MFA without login
-    ea = f"admin_{uuid.uuid4().hex[:8]}@t.co"; reg(c, ea, "ADMIN"); verify(c, ea)
+    # 6. Privileged login deadlock: ADMIN needs MFA to login but can't set up MFA without login.
+    # Self-registering as ADMIN is (correctly) rejected with 422 since the H2 fix,
+    # so register a normal user, promote to ADMIN in the DB, then check login.
+    ea = f"admin_{uuid.uuid4().hex[:8]}@t.co"; reg(c, ea); verify(c, ea)
+    s = SessionLocal()
+    urow = s.query(User).filter(User.email == ea).first()
+    if urow:
+        urow.role = "ADMIN"
+        s.commit()
+    s.close()
     ra = login(c, ea)
     rec("ADMIN can log in (privileged-MFA deadlock check)", ra.status_code == 200,
         f"{ra.status_code}:{ra.text[:90]} (FAIL => privileged accounts cannot authenticate)")
@@ -156,12 +164,13 @@ with TestClient(app, raise_server_exceptions=False) as c:
     rec_l = c.get(f"{API}/balance/reconcile/{cl}", headers=hdr(am))
     rec("AR-2: reconcile after ledger op = MATCHED", rec_l.status_code == 200 and rec_l.json().get("status") == "MATCHED",
         f"{rec_l.status_code} {rec_l.text[:120]}")
-    # legacy charge bypasses ledger -> discrepancy
+    # AR-2 CLOSED: legacy /charge writes the ledger too — reconcile must stay MATCHED.
+    # (This check used to assert DISCREPANCY to document the old bypass gap.)
     c.post(f"{API}/cards/{cl}/charge", headers=hdr(am), json={"amount": 10, "notes": "legacy"})
     rec_l2 = c.get(f"{API}/balance/reconcile/{cl}", headers=hdr(am))
     st = rec_l2.json().get("status") if rec_l2.status_code == 200 else None
-    rec("AR-2 gap: legacy /charge bypasses ledger (=> DISCREPANCY)", st == "DISCREPANCY",
-        f"reconcile status={st} (DISCREPANCY confirms legacy endpoints don't write ledger)")
+    rec("AR-2: legacy /charge writes ledger (reconcile stays MATCHED)", st == "MATCHED",
+        f"reconcile status={st} (DISCREPANCY => a money path bypassed the ledger)")
 
     # ---- TENANT ISOLATION (AR-1) ----
     eb = f"userB_{uuid.uuid4().hex[:8]}@t.co"; reg(c, eb, "STAFF"); verify(c, eb)
